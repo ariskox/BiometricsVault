@@ -106,6 +106,14 @@ struct ContentView: View {
                     }
                 }
             }) { Text("Login with biometrics (unlock)") }
+
+            Button(action: {
+                runBlockAndSetErrorAsync {
+                    let _ = try await vault.reauthenticateOwner()
+                }
+                self.error = nil
+            }) { Text("Reauthenticate owned (if FaceID is locked due to multiple retries)") }
+
             Button(action: {
                 vault.resetEverything()
                 self.error = nil
