@@ -1,5 +1,5 @@
 //
-//  KeychainSecureVault.swift
+//  KeychainUpgradableSecureVault.swift
 //  BiometricsVault
 //
 //  Created by Aris Koxaras on 30/10/24.
@@ -10,10 +10,10 @@
 import Foundation
 
 @MainActor
-public struct KeychainSecureVault<Credentials: Codable> {
+public struct KeychainUpgradableSecureVault<Credentials: Codable> {
     private let keychainKey: String
     private let _credentials: Credentials
-    
+
     init(key: String, storing credentials: Credentials) throws {
         self.keychainKey = key
         self._credentials = credentials
@@ -25,6 +25,12 @@ public struct KeychainSecureVault<Credentials: Codable> {
         return _credentials
     }
 
+    consuming public func upgradeWithBiometrics() async throws -> BiometricsSecureVault<Credentials> {
+        let helper = KeychainCredentials<Credentials>(key: keychainKey, context: nil)
+        let credentials = try helper.retrieve()
+        return try await BiometricsSecureVault<Credentials>(key: keychainKey, storing: credentials)
+    }
+
     consuming public func reset() -> Vault<Credentials> {
         let keychain = KeychainCredentials<Credentials>(key: keychainKey, context: nil)
         try? keychain.delete()
@@ -32,6 +38,6 @@ public struct KeychainSecureVault<Credentials: Codable> {
     }
 
     consuming public func wrap() -> Vault<Credentials> {
-        return .keychain(self)
+        return .keychainUpgradable(self)
     }
 }

@@ -12,21 +12,25 @@ import Foundation
 @MainActor
 public class VaultFactory<Credentials: Codable> {
     public static func retrieveVault(key: String) -> Vault<Credentials> {
-        guard biometricsAvailable else {
-            return .empty(EmptyVault<Credentials>(key: key))
-        }
-
         let context = LAContext()
         context.interactionNotAllowed = true
         let helper = KeychainCredentials<Credentials>(key: key, context: context)
 
         do {
             let credentials = try helper.retrieve()
-            return .keychain(try KeychainSecureVault<Credentials>(key: key, storing: credentials))
+            if biometricsAvailable {
+                return .keychainUpgradable(try KeychainUpgradableSecureVault<Credentials>(key: key, storing: credentials))
+            } else {
+                return .keychain(try KeychainSecureVault<Credentials>(key: key, storing: credentials))
+            }
         } catch let keychainError as SimpleKeychainError where keychainError == .interactionNotAllowed {
             return .locked(LockedBiometricsSecureVault<Credentials>(key: key))
         } catch {
-            return .emptyWithBiometrics(EmptyVaultWithBiometrics<Credentials>(key: key))
+            if biometricsAvailable {
+                return .emptyWithBiometrics(EmptyVaultWithBiometrics<Credentials>(key: key))
+            } else {
+                return .empty(EmptyVault<Credentials>(key: key))
+            }
         }
     }
 

@@ -45,6 +45,8 @@ struct ContentView: View {
                 emptyWithBiometris(vault: vault)
             case .keychain(let vault):
                 keychainSecuredView(vault: vault)
+            case .keychainUpgradable(let vault):
+                keychainUpgradableSecuredView(vault: vault)
             case .biometrics(let vault):
                 biometricsSecured(vault: vault)
             case .locked(let vault):
@@ -95,7 +97,7 @@ struct ContentView: View {
                     username: "user\(Int.random(in: 1...1000))",
                     password: "pass\(Int.random(in: 1...1000))")
                 runBlockAndSetError {
-                    self.vault = .keychain(try vault.storeTokeychain(credentials: credentials))
+                    self.vault = try vault.storeTokeychain(credentials: credentials).wrap()
                 }
             }) { Text("Login with mock credentials") }
 
@@ -151,6 +153,27 @@ struct ContentView: View {
             }
 
             Button(action: {
+                self.vault = vault.reset()
+                self.error = nil
+            }) { Text("Reset Vault (Logout user)").foregroundStyle(.red) }
+        }
+    }
+
+    @ViewBuilder private func keychainUpgradableSecuredView(vault: KeychainUpgradableSecureVault<Credentials>) -> some View {
+        VStack(spacing: 40) {
+            Text("You are logged in with keychain (no biometrics)")
+            Text("You may restart the app to validate that the credentials are retrieved")
+            Text("Use a device to test. Simulator will not work for this feature")
+                .bold()
+                .font(.caption)
+                .foregroundStyle(.red)
+
+            HStack {
+                Text("username: \(vault.credentials.username)")
+                Text("password: \(vault.credentials.password)")
+            }
+
+            Button(action: {
                 runBlockAndSetErrorAsync {
                     self.vault = try await vault.upgradeWithBiometrics().wrap()
                 }
@@ -162,6 +185,7 @@ struct ContentView: View {
             }) { Text("Reset Vault (Logout user)").foregroundStyle(.red) }
         }
     }
+
 
     @ViewBuilder private func biometricsSecured(vault: BiometricsSecureVault<Credentials>) -> some View {
         VStack(spacing: 40) {

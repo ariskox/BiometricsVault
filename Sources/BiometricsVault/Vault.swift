@@ -12,6 +12,7 @@ public enum Vault<Credentials: Codable> {
     case empty(EmptyVault<Credentials>)
     case emptyWithBiometrics(EmptyVaultWithBiometrics<Credentials>)
     case keychain(KeychainSecureVault<Credentials>)
+    case keychainUpgradable(KeychainUpgradableSecureVault<Credentials>)
     case biometrics(BiometricsSecureVault<Credentials>)
     case locked(LockedBiometricsSecureVault<Credentials>)
 }

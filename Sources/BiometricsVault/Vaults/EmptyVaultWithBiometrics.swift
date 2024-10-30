@@ -17,8 +17,8 @@ public struct EmptyVaultWithBiometrics<Credentials: Codable> {
         self.keychainKey = key
     }
 
-    consuming public func storeTokeychain(credentials: Credentials) throws -> KeychainSecureVault<Credentials> {
-        return try KeychainSecureVault<Credentials>(key: keychainKey, storing: credentials)
+    consuming public func storeTokeychain(credentials: Credentials) throws -> KeychainUpgradableSecureVault<Credentials> {
+        return try KeychainUpgradableSecureVault<Credentials>(key: keychainKey, storing: credentials)
     }
 
     consuming public func storeToBiometrics(credentials: Credentials) async throws -> BiometricsSecureVault<Credentials> {
