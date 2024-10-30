@@ -2,7 +2,7 @@
 
 ![SwiftBlade](https://img.shields.io/badge/Swift-6.0-orange.svg) ![iOS](https://img.shields.io/badge/iOS-14.0-blue.svg) ![macOS](https://img.shields.io/badge/macOS-12.0-blue.svg) ![CI](https://github.com/ariskox/BiometricsVault/actions/workflows/swift.yml/badge.svg?branch=main)
 
-BiometricsVault is a Swift 6.0 package that makes supporting biometrics easy for an iOS/macOS application.
+BiometricsVault is a Swift 6.0 package for iOS and macOS that makes supporting biometric login easy.
 
 - [Description](#description)
 - [Requirements](#requirements)
