@@ -63,13 +63,13 @@ public struct BiometricsSecureVault<Credentials: Codable> {
         return _credentials
     }
 
-    consuming public func downgradeToKeychain() throws -> KeychainSecureVault<Credentials> {
+    consuming public func downgradeToKeychain() throws -> KeychainUpgradableSecureVault<Credentials> {
         let secureKeychain = KeychainCredentials<Credentials>(key: keychainKey, context: context)
         let existing = try secureKeychain.retrieve()
 
         try? secureKeychain.delete()
 
-        return try KeychainSecureVault(key: keychainKey, storing: existing)
+        return try KeychainUpgradableSecureVault(key: keychainKey, storing: existing)
     }
 
     consuming public func reset() throws -> Vault<Credentials> {
