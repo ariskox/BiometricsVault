@@ -8,7 +8,7 @@ BiometricsVault is a Swift 6.0 package that makes supporting biometrics easy for
 - [Requirements](#requirements)
 - [Installation](#installation)
 - [Usage](#usage)
-- [State diagram](#statediagram)
+- [State diagram](#state-diagram)
 - [License](#license)
 
 ## Description
