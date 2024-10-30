@@ -143,6 +143,7 @@ stateDiagram-v2
     ΒiometricsSecured --> Ready: disableBiometricsSecureVault
     ΒiometricsSecured --> KeychainSecured: downgradeBiometricsToKeychain
     KeychainSecured --> ΒiometricsSecured: upgradeKeychainWithBiometrics
+    Locked --> Ready: resetEverything
 ```
 
 ## License
