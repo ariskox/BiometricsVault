@@ -17,8 +17,17 @@ BiometricsVault is a Swift 6.0 package that makes supporting biometrics easy for
 ## Description
 
 - BiometricsVault is a library that can store credentials to keychain in two specific ways: Unprotected or protected using biometrics (FaceID/TouchID).
-- It is a state machine with a few states that are described below
-
+- You can use it to easily implement a login flow that can support biometrics.
+- The following scenarios can be easily implemented using BiometricsVault:
+  
+| Scenario                                 | Biometrics Vault                                                     |
+| ---------------------------------------- | -------------------------------------------------------------------- |
+| The user has just logged in              | Persist the credentials on the keychain across app launches          |
+| The user enables FaceID/TouchID          | Protect the credentials using biometrics                             |
+| The user disables FaceID/TouchID         | Delete the credentials or store them without biometrics security     |
+| The app is locked for security reasons   | Ask for FaceID/TouchID authentication an retrieve the credentials    |
+| User continues an app session            | Ask for FaceID/TouchID authentication an retrieve the credentials    |
+| The user logs out                        | Delete the credentials from the keychain                             |
 
 ## Requirements
 
@@ -39,7 +48,7 @@ dependencies: [
 ]
 ```
 
-Normally you'll want to depend on the `BiometricsVault` target:
+Add the `BiometricsVault` as a dependency to your target:
 
 ```swift
 .product(name: "BiometricsVault", package: "BiometricsVault")
