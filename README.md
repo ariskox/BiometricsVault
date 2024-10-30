@@ -108,7 +108,21 @@ let savedCredentials = try await vault.unlockWithBiometrics()
 
 - You want to use the function 'enableSecureVaultWithBiometrics' to transition from the 'ready' state to 'biometricsSecured'
 
-### Example
+### Reauthenticate device owner
+
+- If the FaceID/TouchID is locked due to many failed retries, call 'reauthenticateOwner' to display the PIN entry dialog and unlock the FaceID/TouchID capability.
+- To understand if you have to do this check if the error is of type 'LAError' with code LAError.biometryLockout
+```swift
+
+switch error {
+case let laError as LAError where laError.code == LAError.biometryLockout:
+    let _ = try await vault.reauthenticateOwner()
+default:
+    break // do other stuff
+
+```
+
+## Example
 
 For more information check the sample application at the directory [Example](https://github.com/ariskox/BiometricsVault/tree/main/Example)
 
