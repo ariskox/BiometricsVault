@@ -79,7 +79,7 @@ default:
 - On logout just call reset
 ```swift
 let vault = BiometricsVault<Credentials>(key: "biometrics_credentials")
-vault.reset()
+vault.resetEverything()
 ```
 
 ### Upgrade to FaceID/TouchID
@@ -139,7 +139,7 @@ stateDiagram-v2
     ΒiometricsSecured --> Locked: lock
     Locked --> ΒiometricsSecured: unlockWithBiometrics
     Ready --> KeychainSecured: enableKeychainVault
-    KeychainSecured --> Ready: reset
+    KeychainSecured --> Ready: resetEverything
     ΒiometricsSecured --> Ready: disableBiometricsSecureVault
     ΒiometricsSecured --> KeychainSecured: downgradeBiometricsToKeychain
     KeychainSecured --> ΒiometricsSecured: upgradeKeychainWithBiometrics
