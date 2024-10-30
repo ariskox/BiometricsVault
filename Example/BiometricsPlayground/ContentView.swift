@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import BiometricsVault
 
 struct Credentials: Codable {
     let username: String
@@ -140,7 +141,7 @@ struct ContentView: View {
             Button(action: {
                 vault.resetEverything()
                 self.error = nil
-            }) { Text("Reset").foregroundStyle(.red) }
+            }) { Text("Reset Vault").foregroundStyle(.red) }
 
         }
 
