@@ -32,6 +32,19 @@ Normally you'll want to depend on the `BiometricsVault` target:
 ```swift
 .product(name: "BiometricsVault", package: "BiometricsVault")
 ```
+## State diagram
+
+```mermaid
+graph TD;
+    R(Ready)--enableKeychainVault-->K(Keychain unsecured);
+    K--upgradeKeychainWithBiometrics-->B(Biometrics Secured);
+    R--enableSecureVaultWithBiometrics-->B;
+    B--lock-->BD(Biometrics Locked);
+    BD--unlockWithBiometrics-->B;
+    B--downgradeBiometricsToKeychain-->K;
+    B--reset-->R;
+    K--reset-->R;
+```
 
 ## License
 
