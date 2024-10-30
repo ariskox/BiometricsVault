@@ -131,6 +131,21 @@ For more information check the sample application at the directory [Example](htt
   
 ## State diagram
 
+### Simple state diagram
+
+A simple login flow that enables the FaceID/TouchID option from the settings is as follows:
+
+```mermaid
+stateDiagram-v2
+    [*] --> Ready
+    Ready --> KeychainSecured: enableKeychainVault
+    KeychainSecured --> ΒiometricsSecured: upgradeKeychainWithBiometrics
+    ΒiometricsSecured --> Locked: lock
+    Locked --> ΒiometricsSecured: unlockWithBiometrics
+    ΒiometricsSecured --> Ready: disableBiometricsSecureVault
+```
+
+### Full diagram
 ```mermaid
 stateDiagram-v2
     [*] --> Ready
