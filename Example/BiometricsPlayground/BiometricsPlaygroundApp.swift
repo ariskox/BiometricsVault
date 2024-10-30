@@ -6,12 +6,15 @@
 //
 
 import SwiftUI
+import BiometricsVault
 
 @main
 struct BiometricsPlaygroundApp: App {
+    var vault = BiometricsVault<Credentials>(key: "biometrics_credentials")
+
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            ContentView(vault: vault)
         }
     }
 }

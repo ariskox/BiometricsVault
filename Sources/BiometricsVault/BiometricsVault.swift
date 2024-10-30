@@ -82,9 +82,8 @@ public class BiometricsVault<Credentials: Codable>: ObservableObject {
 
         let helper = KeychainCredentials<Credentials>(key: keychainKey, context: nil)
         let credentials = try helper.retrieve()
-        self.state = .ready
 
-        try await enableSecureVaultWithBiometrics(saving: credentials)
+        try await saveWithBiometrics(credentials: credentials)
     }
 
     public func enableSecureVaultWithBiometrics(saving credentials: Credentials) async throws {
@@ -100,37 +99,7 @@ public class BiometricsVault<Credentials: Codable>: ObservableObject {
         case .biometricsSecured:
             throw VaultError.alreadySecuredWithBiometrics
         }
-
-        let context = LAContext()
-        var error: NSError?
-        let canEvaluate = context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error)
-
-        guard canEvaluate else {
-            if let error {
-                throw error
-            } else {
-                throw VaultError.notAvailable
-            }
-        }
-
-        let _ = try await context.evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, localizedReason: NSLocalizedString("login_with_biometrics", comment: ""))
-
-        let accessControl = getBioSecAccessControl()
-        let result = try await context.evaluateAccessControl(accessControl,
-                                                             operation: .createItem,
-                                                             localizedReason: NSLocalizedString("login_with_biometrics", comment: ""))
-
-        guard result else {
-            throw VaultError.storingFailure
-        }
-
-        let unsecuredKeychain = KeychainCredentials<Credentials>(key: keychainKey, context: nil)
-        // Don't care about the error
-        try? unsecuredKeychain.delete()
-
-        let helper = KeychainCredentials<Credentials>(key: keychainKey, context: context)
-        try helper.store(credentials: credentials)
-        self.state = .biometricsSecured(VaultData(context: context))
+        try await saveWithBiometrics(credentials: credentials)
     }
 
     public func downgradeBiometricsToKeychain() throws {
@@ -249,6 +218,39 @@ public class BiometricsVault<Credentials: Codable>: ObservableObject {
     }
 
     // MARK: - Private
+
+    private func saveWithBiometrics(credentials: Credentials) async throws {
+        let context = LAContext()
+        var error: NSError?
+        let canEvaluate = context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error)
+
+        guard canEvaluate else {
+            if let error {
+                throw error
+            } else {
+                throw VaultError.notAvailable
+            }
+        }
+
+        let _ = try await context.evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, localizedReason: NSLocalizedString("login_with_biometrics", comment: ""))
+
+        let accessControl = getBioSecAccessControl()
+        let result = try await context.evaluateAccessControl(accessControl,
+                                                             operation: .createItem,
+                                                             localizedReason: NSLocalizedString("login_with_biometrics", comment: ""))
+
+        guard result else {
+            throw VaultError.storingFailure
+        }
+
+        let unsecuredKeychain = KeychainCredentials<Credentials>(key: keychainKey, context: nil)
+        // Don't care about the error
+        try? unsecuredKeychain.delete()
+
+        let helper = KeychainCredentials<Credentials>(key: keychainKey, context: context)
+        try helper.store(credentials: credentials)
+        self.state = .biometricsSecured(VaultData(context: context))
+    }
 
     nonisolated private func getBioSecAccessControl() -> SecAccessControl {
         var error: Unmanaged<CFError>?
