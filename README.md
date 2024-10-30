@@ -8,6 +8,9 @@ BiometricsVault is a Swift 6.0 package that makes supporting biometrics easy for
 - [Requirements](#requirements)
 - [Installation](#installation)
 - [Usage](#usage)
+    - [Login without enabling biometrics right away](#without-faceidtouchid)
+    - [Upgrade to Biometrics](#upgrade-to-faceidtouchid)
+    - [Login and enable Biometrics ](#login-with-credentials-and-remember-with-faceidtouchid)
 - [State diagram](#state-diagram)
 - [License](#license)
 
