@@ -21,13 +21,46 @@ struct SampleError: Error, LocalizedError {
 }
 
 struct ContentView: View {
-    @StateObject private var vault = BiometricsVault<Credentials>(key: "biometrics_credentials")
+    @StateObject private var vault = SecretsVault<Credentials>(key: "biometrics_credentials")
     @State private var credentials: Credentials?
     @State private var error: Error?
 
     var body: some View {
-        VStack(spacing: 35) {
+        VStack(spacing: 25) {
             Text(vault.state.debugDescription)
+            HStack {
+                Text("username: \(credentials?.username ?? "")")
+                Text("password: \(credentials?.password ?? "")")
+            }
+            Text("Error: \(error?.localizedDescription ?? "")")
+                .foregroundColor(error == nil ? .primary : .red)
+
+            Button(action: {
+                guard let credentials = credentials else {
+                    self.error = SampleError(message: "Select credentials first")
+                    return
+                }
+                do {
+                    try vault.enableKeychainVault(saving: credentials)
+                    self.error = nil
+                }
+                catch {
+                    self.error = error
+                }
+            }) { Text("Enable keychain vault and save credentials") }
+
+            Button(action: {
+                Task {
+                    do {
+                        try await vault.upgradeKeychainWithBiometrics()
+                        self.error = nil
+                    }
+                    catch {
+                        self.error = error
+                    }
+                }
+            }) { Text("Upgrade keychain to biometrics") }
+
             Button(action: {
                 guard let credentials = credentials else {
                     self.error = SampleError(message: "Select credentials first")
@@ -35,18 +68,30 @@ struct ContentView: View {
                 }
                 Task {
                     do {
-                        try await vault.enableBiometrics(saving: credentials)
+                        try await vault.enableSecureVaultWithBiometrics(saving: credentials)
                         self.error = nil
                     }
                     catch {
                         self.error = error
                     }
                 }
-            }) { Text("Enable vault and save credentials") }
+            }) { Text("Enable biometrics vault and save credentials") }
+
+            Button(action: {
+                Task {
+                    do {
+                        try vault.downgradeBiometricsToKeychain()
+                        self.error = nil
+                    }
+                    catch {
+                        self.error = error
+                    }
+                }
+            }) { Text("Downgrade biometrics to keychain") }
 
             Button(action: {
                 do {
-                    try vault.disableBiometrics()
+                    try vault.disableBiometricsSecureVault()
                     self.error = nil
                 }
                 catch {
@@ -95,13 +140,7 @@ struct ContentView: View {
             Button(action: {
                 vault.resetEverything()
                 self.error = nil
-            }) { Text("Reset") }
-
-            Text("username: \(credentials?.username ?? "")")
-            Text("password: \(credentials?.password ?? "")")
-
-            Text("Error: \(error?.localizedDescription ?? "")")
-                .foregroundColor(error == nil ? .primary : .red)
+            }) { Text("Reset").foregroundStyle(.red) }
 
         }
 

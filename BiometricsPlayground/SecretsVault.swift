@@ -1,5 +1,5 @@
 //
-//  BiometricsVault.swift
+//  SecretsVault.swift
 //  BiometricsPlayground
 //
 //  Created by Aris Koxaras on 30/10/24.
@@ -56,7 +56,7 @@ public class VaultData {
 }
 
 @MainActor
-public class BiometricsVault<Credentials: Codable>: ObservableObject {
+public class SecretsVault<Credentials: Codable>: ObservableObject {
     @Published public private(set) var state: State = .unavailable
 
     private let keychainKey: String
@@ -64,14 +64,24 @@ public class BiometricsVault<Credentials: Codable>: ObservableObject {
     public enum State: CustomDebugStringConvertible {
         case unavailable
         case ready
-        case enabled(VaultData)
+        case keychainSecured(Credentials)
+        case biometricsSecured(VaultData)
         case locked
 
-        public var isEnabled: Bool {
+        public var isBiometricsSecured: Bool {
             switch self {
-            case .enabled:
+            case .biometricsSecured:
                 return true
-            case .unavailable, .ready, .locked:
+            case .unavailable, .ready, .locked, .keychainSecured:
+                return false
+            }
+        }
+
+        public var isKeychainSecured: Bool {
+            switch self {
+            case .keychainSecured:
+                return true
+            case .unavailable, .ready, .locked, .biometricsSecured:
                 return false
             }
         }
@@ -80,7 +90,7 @@ public class BiometricsVault<Credentials: Codable>: ObservableObject {
             switch self {
             case .ready:
                 return true
-            case .unavailable, .enabled, .locked:
+            case .unavailable, .biometricsSecured, .locked, .keychainSecured:
                 return false
             }
         }
@@ -91,8 +101,10 @@ public class BiometricsVault<Credentials: Codable>: ObservableObject {
                 return "Biometrics are not available"
             case .ready:
                 return "Vault is ready"
-            case .enabled:
-                return "Vault is enabled (secure)"
+            case .keychainSecured:
+                return "Vault is enabled (Keychain)"
+            case .biometricsSecured:
+                return "Vault is enabled (Biometrics!)"
             case .locked:
                 return "Vault is locked"
             }
@@ -100,36 +112,47 @@ public class BiometricsVault<Credentials: Codable>: ObservableObject {
     }
 
     public enum VaultError: Error, LocalizedError {
-        case notEnabled
-        case notLocked
-        case alreadyLocked
         case notAvailable
-        case notReadyOrAlreadyEnabled
-        case lockedUseReset
+
+        case notEnabled
+
+        case notSecuredWithBiometrics
+        case notLockedWithBiometrics
+        case alreadyLockedWithBiometrics
+        case lockedWithBiometricsUseReset
+        case lockedWithBiometricsCannotEnable
+        case alreadyUsesKeychain
+        case alreadySecuredByKeychainUseSecureFunction
+        case alreadySecuredWithBiometrics
         case retrievalFailure
         case storingFailure
-        case cannotEnableAlreadyLocked
 
         public var errorDescription: String? {
             switch self {
+            case .notAvailable:
+                return NSLocalizedString("biometrics_not_available", comment: "")
             case .notEnabled:
                 return NSLocalizedString("biometrics_not_enabled", comment: "")
-            case .notAvailable:
-                return NSLocalizedString("biometrics.not_available", comment: "")
-            case .notReadyOrAlreadyEnabled:
+            case .notSecuredWithBiometrics:
+                return NSLocalizedString("biometrics_not_secured", comment: "")
+            case .notLockedWithBiometrics:
+                return NSLocalizedString("biometrics_not_locked", comment: "")
+            case .lockedWithBiometricsUseReset:
+                return NSLocalizedString("biometrics_locked_use_reset", comment: "")
+            case .lockedWithBiometricsCannotEnable:
+                return NSLocalizedString("biometrics_cannot_enable_already_locked", comment: "")
+            case .alreadyUsesKeychain:
+                return NSLocalizedString("biometrics_keychain_active", comment: "")
+            case .alreadySecuredByKeychainUseSecureFunction:
+                return NSLocalizedString("biometrics_keychain_active_use_secure", comment: "")
+            case .alreadySecuredWithBiometrics:
                 return NSLocalizedString("biometrics_not_ready_or_enabled", comment: "")
+            case .alreadyLockedWithBiometrics:
+                return NSLocalizedString("biometrics_already_locked", comment: "")
             case .retrievalFailure:
                 return NSLocalizedString("biometrics_retrieval_failure", comment: "")
             case .storingFailure:
                 return NSLocalizedString("biometrics_storing_failure", comment: "")
-            case .notLocked:
-                return NSLocalizedString("biometrics_not_locked", comment: "")
-            case .lockedUseReset:
-                return NSLocalizedString("biometrics_locked_use_reset", comment: "")
-            case .cannotEnableAlreadyLocked:
-                return NSLocalizedString("biometrics_cannot_enable_already_locked", comment: "")
-            case .alreadyLocked:
-                return NSLocalizedString("biometrics_already_locked", comment: "")
             }
         }
     }
@@ -146,8 +169,7 @@ public class BiometricsVault<Credentials: Codable>: ObservableObject {
 
             do {
                 let credentials = try helper.loadFromKeychain()
-                // This should not happen !!!!
-                self.state = .enabled(VaultData(context: context))
+                self.state = .keychainSecured(credentials)
             } catch let keychainError as SimpleKeychainError where keychainError == .interactionNotAllowed {
                 self.state = .locked
             } catch {
@@ -164,19 +186,61 @@ public class BiometricsVault<Credentials: Codable>: ObservableObject {
     }
 
     public var biometricsEnabled: Bool {
-        return state.isEnabled
+        return state.isBiometricsSecured
     }
 
-    public func enableBiometrics(saving credentials: Credentials) async throws {
+    public func enableKeychainVault(saving credentials: Credentials) throws {
         switch state {
         case .locked:
-            throw VaultError.cannotEnableAlreadyLocked
+            throw VaultError.lockedWithBiometricsCannotEnable
         case .ready:
             break
         case .unavailable:
             throw VaultError.notAvailable
-        case .enabled:
-            throw VaultError.notReadyOrAlreadyEnabled
+        case .keychainSecured:
+            throw VaultError.alreadyUsesKeychain
+        case .biometricsSecured:
+            throw VaultError.alreadySecuredWithBiometrics
+        }
+
+        let helper = KeychainHelper<Credentials>(key: keychainKey, context: nil)
+        try helper.storeToKeychain(credentials: credentials)
+        self.state = .keychainSecured(credentials)
+    }
+
+    public func upgradeKeychainWithBiometrics() async throws {
+        switch state {
+        case .locked:
+            throw VaultError.lockedWithBiometricsCannotEnable
+        case .ready:
+            break
+        case .unavailable:
+            throw VaultError.notAvailable
+        case .keychainSecured:
+            break
+        case .biometricsSecured:
+            throw VaultError.alreadySecuredWithBiometrics
+        }
+
+        let helper = KeychainHelper<Credentials>(key: keychainKey, context: nil)
+        let credentials = try helper.loadFromKeychain()
+        self.state = .ready
+
+        try await enableSecureVaultWithBiometrics(saving: credentials)
+    }
+
+    public func enableSecureVaultWithBiometrics(saving credentials: Credentials) async throws {
+        switch state {
+        case .locked:
+            throw VaultError.lockedWithBiometricsCannotEnable
+        case .ready:
+            break
+        case .unavailable:
+            throw VaultError.notAvailable
+        case .keychainSecured:
+            throw VaultError.alreadySecuredByKeychainUseSecureFunction
+        case .biometricsSecured:
+            throw VaultError.alreadySecuredWithBiometrics
         }
 
         let context = LAContext()
@@ -207,19 +271,43 @@ public class BiometricsVault<Credentials: Codable>: ObservableObject {
 
         let helper = KeychainHelper<Credentials>(key: keychainKey, context: context)
         try helper.storeToKeychain(credentials: credentials)
-        context.touchIDAuthenticationAllowableReuseDuration = 60 * 60 // 1 hour
-        self.state = .enabled(VaultData(context: context))
+        self.state = .biometricsSecured(VaultData(context: context))
     }
 
-    public func disableBiometrics() throws {
+    public func downgradeBiometricsToKeychain() throws {
         switch state {
         case .locked:
-            throw VaultError.lockedUseReset
+            throw VaultError.lockedWithBiometricsUseReset
         case .ready:
             throw VaultError.notEnabled
         case .unavailable:
             throw VaultError.notAvailable
-        case .enabled(let vaultData):
+        case .keychainSecured:
+            throw VaultError.notSecuredWithBiometrics
+        case .biometricsSecured(let vaultData):
+            let secureKeychain = KeychainHelper<Credentials>(key: keychainKey, context: vaultData.context)
+            let existing = try secureKeychain.loadFromKeychain()
+            try? secureKeychain.deleteKeychainData()
+
+            let newContext = LAContext()
+            let newChain = KeychainHelper<Credentials>(key: keychainKey, context: newContext)
+            try newChain.storeToKeychain(credentials: existing)
+            self.state = .keychainSecured(existing)
+        }
+    }
+
+
+    public func disableBiometricsSecureVault() throws {
+        switch state {
+        case .locked:
+            throw VaultError.lockedWithBiometricsUseReset
+        case .ready:
+            throw VaultError.notEnabled
+        case .unavailable:
+            throw VaultError.notAvailable
+        case .keychainSecured:
+            throw VaultError.notSecuredWithBiometrics
+        case .biometricsSecured(let vaultData):
             let secureKeychain = KeychainHelper<Credentials>(key: keychainKey, context: vaultData.context)
             try secureKeychain.deleteKeychainData()
 
@@ -230,12 +318,14 @@ public class BiometricsVault<Credentials: Codable>: ObservableObject {
     public func lock() throws -> Bool {
         switch state {
         case .locked:
-            throw VaultError.alreadyLocked
+            throw VaultError.alreadyLockedWithBiometrics
         case .ready:
             throw VaultError.notEnabled
         case .unavailable:
             throw VaultError.notAvailable
-        case .enabled:
+        case .keychainSecured:
+            throw VaultError.notSecuredWithBiometrics
+        case .biometricsSecured:
             break
         }
 
@@ -251,8 +341,10 @@ public class BiometricsVault<Credentials: Codable>: ObservableObject {
             throw VaultError.notEnabled
         case .unavailable:
             throw VaultError.notAvailable
-        case .enabled:
-            throw VaultError.notLocked
+        case .biometricsSecured:
+            throw VaultError.notLockedWithBiometrics
+        case .keychainSecured:
+            throw VaultError.notLockedWithBiometrics
         }
 
         // load user from keychain. Validate token ?
@@ -279,7 +371,7 @@ public class BiometricsVault<Credentials: Codable>: ObservableObject {
         let helper = KeychainHelper<Credentials>(key: keychainKey, context: context)
         let credentials = try helper.loadFromKeychain()
 
-        self.state = .enabled(VaultData(context: context))
+        self.state = .biometricsSecured(VaultData(context: context))
 
         return credentials
     }
