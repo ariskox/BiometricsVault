@@ -78,8 +78,26 @@ vault.reset()
 let vault = BiometricsVault<Credentials>(key: "biometrics_credentials")
 try await vault.upgradeKeychainWithBiometrics()
 ```
-- The state now will be set to 'biometricsSecured' 
+- The state now will be set to 'biometricsSecured' and you'll need to check for this when starting up your app
+- You can use the 'lock' function to lock the vault. When the vault is locked you shouldn't keep the credentials in the memory anymore and the only screen you're allowed to display to the user is a 'Login with biometrics page' with a 'Login' button
+- When the user taps this 'Login' button, you should call 'unlockWithBiometrics' and you'll get the credentials back after a successfull authentication
 
+```swift
+let vault = BiometricsVault<Credentials>(key: "biometrics_credentials")
+let savedCredentials = try await vault.unlockWithBiometrics()
+```
+
+- When the user chooses to disable the FaceID/TouchID (and the vault isn't locked) you have two options. 
+    - To downgrade to simple keychain security -> Call downgradeBiometricsToKeychain()
+    - To forget the credentials -> Call disableBiometricsSecureVault
+
+### Login with credentials and remember with FaceID/TouchID
+
+- You want to use the function 'enableSecureVaultWithBiometrics' to transition from the 'ready' state to 'biometricsSecured'
+
+### Example
+
+For more information check the sample application at the directory [Example](https://github.com/ariskox/BiometricsVault/tree/main/Example)
 
 ## States
 
@@ -87,12 +105,16 @@ try await vault.upgradeKeychainWithBiometrics()
     - The device or the application doesn't support authentication with biometrics.
 - Ready
     - The Vault is ready to store the credentials to keychain with biometrics lock or unprotected
+    - No credentials exist in the keychain, so the user is logged out
 - ΒiometricsSecured
     - The credentials have been stored to the keychain and are protected by biometrics. They ARE available to us, as the user has been authenticated with biometrics. 🔓
+    - The user is logged in and the credentials are available
 - Locked
     - The credentials have been stored to the keychain and are protected by biometrics, but they are NOT available to us, UNLESS the user authenticates with biometrics first 🔒
-- KeychainSecured
+    - The user is presented a 'Login with biometrics' screen. He/she can press 'Login' or 'Change account' (reset)
+- KeychainSecured 
     - The credentials have been stored to the keychain but THEY ARE NOT protected by biometrics
+    - The FaceID/TouchID have not been enabled. The user is logged in
   
 ## State diagram
 
