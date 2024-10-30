@@ -22,7 +22,7 @@ struct SampleError: Error, LocalizedError {
 }
 
 struct ContentView: View {
-    @ObservedObject var vault: BiometricsVault<Credentials>
+    @State var vault: Vault<Credentials>
     @State private var credentials: Credentials?
     @State private var error: Error?
 
@@ -31,23 +31,25 @@ struct ContentView: View {
         return "Error: \(error.localizedDescription)"
     }
 
+    init() {
+        self.vault = VaultFactory.retrieveVault(key: "biometrics_credentials")
+    }
+    
     var body: some View {
         VStack {
             Spacer()
-
-            switch vault.state {
-            case .unavailable:
-                unavailableView
-            case .ready:
-                readyView
-            case .locked:
-                lockedView
-            case .keychainSecured(let credentials):
-                keychainSecuredView(credentials: credentials)
-            case .biometricsSecured:
-                biometricsSecured
+            switch vault {
+            case .empty(let vault):
+                emptyNoBiometrics(vault: vault)
+            case .emptyWithBiometrics(let vault):
+                emptyWithBiometris(vault: vault)
+            case .keychain(let vault):
+                keychainSecuredView(vault: vault)
+            case .biometrics(let vault):
+                biometricsSecured(vault: vault)
+            case .locked(let vault):
+                lockedView(vault: vault)
             }
-
             Spacer()
 
             Text(errorTextOrNil)
@@ -58,7 +60,6 @@ struct ContentView: View {
         }
         .padding()
     }
-
 
     @ViewBuilder private var unavailableView: some View {
         VStack(spacing: 40) {
@@ -71,7 +72,7 @@ struct ContentView: View {
         }
     }
 
-    @ViewBuilder private var readyView: some View {
+    @ViewBuilder private func emptyNoBiometrics(vault: EmptyVault<Credentials>) -> some View {
         VStack(spacing: 40) {
             Text("You are now ready to login")
             Button(action: {
@@ -79,7 +80,22 @@ struct ContentView: View {
                     username: "user\(Int.random(in: 1...1000))",
                     password: "pass\(Int.random(in: 1...1000))")
                 runBlockAndSetError {
-                    try vault.enableKeychainVault(saving: credentials)
+                    self.vault = try vault.storeTokeychain(credentials: credentials).wrap()
+                }
+            }) { Text("Login with mock credentials") }
+
+        }
+    }
+
+    @ViewBuilder private func emptyWithBiometris(vault: EmptyVaultWithBiometrics<Credentials>) -> some View {
+        VStack(spacing: 40) {
+            Text("You are now ready to login")
+            Button(action: {
+                let credentials = Credentials(
+                    username: "user\(Int.random(in: 1...1000))",
+                    password: "pass\(Int.random(in: 1...1000))")
+                runBlockAndSetError {
+                    self.vault = .keychain(try vault.storeTokeychain(credentials: credentials))
                 }
             }) { Text("Login with mock credentials") }
 
@@ -88,21 +104,20 @@ struct ContentView: View {
                     username: "user\(Int.random(in: 1...1000))",
                     password: "pass\(Int.random(in: 1...1000))")
                 runBlockAndSetErrorAsync {
-                    try await vault.enableSecureVaultWithBiometrics(saving: credentials)
+                    self.vault = try await vault.storeToBiometrics(credentials: credentials).wrap()
                 }
             }) { Text("Login with mock credentials AND protect with FaceID in 1 step") }
 
         }
     }
 
-    @ViewBuilder private var lockedView: some View {
+    @ViewBuilder private func lockedView(vault: LockedBiometricsSecureVault<Credentials>) -> some View {
         VStack(spacing: 40) {
             Text("Biometrics are locked")
             Button(action: {
                 Task {
                     runBlockAndSetErrorAsync {
-                        let credentials = try await vault.unlockWithBiometrics()
-                        self.credentials = credentials
+                        self.vault = try await vault.unlock().wrap()
                     }
                 }
             }) { Text("Login with biometrics (unlock)") }
@@ -115,13 +130,13 @@ struct ContentView: View {
             }) { Text("Reauthenticate owned (if FaceID is locked due to multiple retries)") }
 
             Button(action: {
-                vault.resetEverything()
+                self.vault = vault.reset()
                 self.error = nil
             }) { Text("Reset Vault (Logout user)").foregroundStyle(.red) }
         }
     }
 
-    @ViewBuilder private func keychainSecuredView(credentials: Credentials) -> some View {
+    @ViewBuilder private func keychainSecuredView(vault: KeychainSecureVault<Credentials>) -> some View {
         VStack(spacing: 40) {
             Text("You are logged in with keychain (no biometrics)")
             Text("You may restart the app to validate that the credentials are retrieved")
@@ -131,30 +146,24 @@ struct ContentView: View {
                 .foregroundStyle(.red)
 
             HStack {
-                Text("username: \(credentials.username)")
-                Text("password: \(credentials.password)")
-            }
-
-            if vault.biometricsAvailable {
-                Button(action: {
-                    runBlockAndSetErrorAsync {
-                        try await vault.upgradeKeychainWithBiometrics()
-                    }
-                }) { Text("Upgrade to biometrics (enable FaceID)") }
-            } else {
-                Text("Biometrics are not available")
-                    .bold()
-                    .foregroundStyle(.red)
+                Text("username: \(vault.credentials.username)")
+                Text("password: \(vault.credentials.password)")
             }
 
             Button(action: {
-                vault.resetEverything()
+                runBlockAndSetErrorAsync {
+                    self.vault = try await vault.upgradeWithBiometrics().wrap()
+                }
+            }) { Text("Upgrade to biometrics (enable FaceID)") }
+
+            Button(action: {
+                self.vault = vault.reset()
                 self.error = nil
             }) { Text("Reset Vault (Logout user)").foregroundStyle(.red) }
         }
     }
 
-    @ViewBuilder private var biometricsSecured: some View {
+    @ViewBuilder private func biometricsSecured(vault: BiometricsSecureVault<Credentials>) -> some View {
         VStack(spacing: 40) {
             Text("You are logged in and biometrics are enabled (unlocked)")
             Text("You may restart the app to validate that the credentials are retrieved")
@@ -164,19 +173,23 @@ struct ContentView: View {
                 .foregroundStyle(.red)
 
             HStack {
-                Text("username: \(credentials?.username ?? "")")
-                Text("password: \(credentials?.password ?? "")")
+                Text("username: \(vault.credentials.username)")
+                Text("password: \(vault.credentials.password)")
             }
 
             Button(action: {
                 runBlockAndSetError {
-                    try vault.downgradeBiometricsToKeychain()
+                    self.vault = try vault.downgradeToKeychain().wrap()
                 }
             }) { Text("Disable FaceID/TouchID") }
 
             Button(action: {
+                self.vault = vault.lock().wrap()
+            }) { Text("Lock") }
+
+            Button(action: {
                 runBlockAndSetError {
-                    try vault.disableBiometricsSecureVault()
+                    self.vault = try vault.reset()
                 }
             }) { Text("Logout user with FaceID").foregroundStyle(.red) }
         }
@@ -206,6 +219,5 @@ struct ContentView: View {
 }
 
 #Preview {
-    @Previewable @StateObject var vault = BiometricsVault<Credentials>(key: "biometrics_credentials")
-    ContentView(vault: vault)
+    ContentView()
 }
