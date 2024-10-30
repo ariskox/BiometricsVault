@@ -1,0 +1,15 @@
+{
+  "originHash" : "74826ea481ba2a15540e9d0ea7e3c72f6f2b71a577d548917e69ab17d0f3ff37",
+  "pins" : [
+    {
+      "identity" : "simplekeychain",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/auth0/SimpleKeychain.git",
+      "state" : {
+        "revision" : "b694f155907b189bc82e93586695a26f558c742f",
+        "version" : "1.2.0"
+      }
+    }
+  ],
+  "version" : 3
+}

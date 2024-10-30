@@ -69,3 +69,5 @@ xcuserdata/
 *.xccheckout
 *.xcscmblueprint
 
+
+.build
