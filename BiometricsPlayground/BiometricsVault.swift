@@ -1,5 +1,5 @@
 //
-//  SecretsVault.swift
+//  BiometricsVault.swift
 //  BiometricsPlayground
 //
 //  Created by Aris Koxaras on 30/10/24.
@@ -10,7 +10,7 @@ import Combine
 @preconcurrency import LocalAuthentication
 @preconcurrency import SimpleKeychain
 
-final class KeychainHelper<Credentials: Codable>: Sendable {
+final class KeychainCredentials<Credentials: Codable>: Sendable {
     private let chain: SimpleKeychain
     private let key: String
 
@@ -22,7 +22,7 @@ final class KeychainHelper<Credentials: Codable>: Sendable {
 
     func updateCredentials(_ credentials: Credentials?) throws -> Bool {
         guard let credentials else {
-            try deleteKeychainData()
+            try delete()
             return false
         }
         let data = try JSONEncoder().encode(credentials)
@@ -30,18 +30,18 @@ final class KeychainHelper<Credentials: Codable>: Sendable {
         return true
     }
 
-    func loadFromKeychain() throws -> Credentials {
+    func load() throws -> Credentials {
         let data = try chain.data(forKey: key)
         let credentials = try JSONDecoder().decode(Credentials.self, from: data)
         return credentials
     }
 
-    func storeToKeychain(credentials: Credentials) throws {
+    func store(credentials: Credentials) throws {
         let data = try JSONEncoder().encode(credentials)
         try chain.set(data, forKey: key)
     }
 
-    func deleteKeychainData() throws {
+    func delete() throws {
         try chain.deleteItem(forKey: key)
     }
 }
@@ -56,7 +56,7 @@ public class VaultData {
 }
 
 @MainActor
-public class SecretsVault<Credentials: Codable>: ObservableObject {
+public class BiometricsVault<Credentials: Codable>: ObservableObject {
     @Published public private(set) var state: State = .unavailable
 
     private let keychainKey: String
@@ -165,10 +165,10 @@ public class SecretsVault<Credentials: Codable>: ObservableObject {
         } else {
             let context = LAContext()
             context.interactionNotAllowed = true
-            let helper = KeychainHelper<Credentials>(key: keychainKey, context: context)
+            let helper = KeychainCredentials<Credentials>(key: keychainKey, context: context)
 
             do {
-                let credentials = try helper.loadFromKeychain()
+                let credentials = try helper.load()
                 self.state = .keychainSecured(credentials)
             } catch let keychainError as SimpleKeychainError where keychainError == .interactionNotAllowed {
                 self.state = .locked
@@ -203,8 +203,8 @@ public class SecretsVault<Credentials: Codable>: ObservableObject {
             throw VaultError.alreadySecuredWithBiometrics
         }
 
-        let helper = KeychainHelper<Credentials>(key: keychainKey, context: nil)
-        try helper.storeToKeychain(credentials: credentials)
+        let helper = KeychainCredentials<Credentials>(key: keychainKey, context: nil)
+        try helper.store(credentials: credentials)
         self.state = .keychainSecured(credentials)
     }
 
@@ -222,8 +222,8 @@ public class SecretsVault<Credentials: Codable>: ObservableObject {
             throw VaultError.alreadySecuredWithBiometrics
         }
 
-        let helper = KeychainHelper<Credentials>(key: keychainKey, context: nil)
-        let credentials = try helper.loadFromKeychain()
+        let helper = KeychainCredentials<Credentials>(key: keychainKey, context: nil)
+        let credentials = try helper.load()
         self.state = .ready
 
         try await enableSecureVaultWithBiometrics(saving: credentials)
@@ -265,12 +265,12 @@ public class SecretsVault<Credentials: Codable>: ObservableObject {
             throw VaultError.storingFailure
         }
 
-        let unsecuredKeychain = KeychainHelper<Credentials>(key: keychainKey, context: nil)
+        let unsecuredKeychain = KeychainCredentials<Credentials>(key: keychainKey, context: nil)
         // Don't care about the error
-        try? unsecuredKeychain.deleteKeychainData()
+        try? unsecuredKeychain.delete()
 
-        let helper = KeychainHelper<Credentials>(key: keychainKey, context: context)
-        try helper.storeToKeychain(credentials: credentials)
+        let helper = KeychainCredentials<Credentials>(key: keychainKey, context: context)
+        try helper.store(credentials: credentials)
         self.state = .biometricsSecured(VaultData(context: context))
     }
 
@@ -285,13 +285,13 @@ public class SecretsVault<Credentials: Codable>: ObservableObject {
         case .keychainSecured:
             throw VaultError.notSecuredWithBiometrics
         case .biometricsSecured(let vaultData):
-            let secureKeychain = KeychainHelper<Credentials>(key: keychainKey, context: vaultData.context)
-            let existing = try secureKeychain.loadFromKeychain()
-            try? secureKeychain.deleteKeychainData()
+            let secureKeychain = KeychainCredentials<Credentials>(key: keychainKey, context: vaultData.context)
+            let existing = try secureKeychain.load()
+            try? secureKeychain.delete()
 
             let newContext = LAContext()
-            let newChain = KeychainHelper<Credentials>(key: keychainKey, context: newContext)
-            try newChain.storeToKeychain(credentials: existing)
+            let newChain = KeychainCredentials<Credentials>(key: keychainKey, context: newContext)
+            try newChain.store(credentials: existing)
             self.state = .keychainSecured(existing)
         }
     }
@@ -308,8 +308,8 @@ public class SecretsVault<Credentials: Codable>: ObservableObject {
         case .keychainSecured:
             throw VaultError.notSecuredWithBiometrics
         case .biometricsSecured(let vaultData):
-            let secureKeychain = KeychainHelper<Credentials>(key: keychainKey, context: vaultData.context)
-            try secureKeychain.deleteKeychainData()
+            let secureKeychain = KeychainCredentials<Credentials>(key: keychainKey, context: vaultData.context)
+            try secureKeychain.delete()
 
             self.state = .ready
         }
@@ -368,8 +368,8 @@ public class SecretsVault<Credentials: Codable>: ObservableObject {
             throw VaultError.retrievalFailure
         }
 
-        let helper = KeychainHelper<Credentials>(key: keychainKey, context: context)
-        let credentials = try helper.loadFromKeychain()
+        let helper = KeychainCredentials<Credentials>(key: keychainKey, context: context)
+        let credentials = try helper.load()
 
         self.state = .biometricsSecured(VaultData(context: context))
 
@@ -383,8 +383,8 @@ public class SecretsVault<Credentials: Codable>: ObservableObject {
     }
 
     public func resetEverything() {
-        let keychain = KeychainHelper<Credentials>(key: keychainKey, context: nil)
-        try? keychain.deleteKeychainData()
+        let keychain = KeychainCredentials<Credentials>(key: keychainKey, context: nil)
+        try? keychain.delete()
         self.state = .ready
     }
 

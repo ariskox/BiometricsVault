@@ -21,7 +21,7 @@ struct SampleError: Error, LocalizedError {
 }
 
 struct ContentView: View {
-    @StateObject private var vault = SecretsVault<Credentials>(key: "biometrics_credentials")
+    @StateObject private var vault = BiometricsVault<Credentials>(key: "biometrics_credentials")
     @State private var credentials: Credentials?
     @State private var error: Error?
 
