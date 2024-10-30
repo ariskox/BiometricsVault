@@ -7,7 +7,7 @@ BiometricsVault is a Swift 6.0 package that makes supporting biometrics easy for
 - [Description](#description)
 - [Requirements](#requirements)
 - [Installation](#installation)
-- [How to use](#howtouse)
+- [Usage](#usage)
 - [State diagram](#statediagram)
 - [License](#license)
 
@@ -41,7 +41,44 @@ Normally you'll want to depend on the `BiometricsVault` target:
 .product(name: "BiometricsVault", package: "BiometricsVault")
 ```
 
-## How to use
+## Usage
+
+### Without FaceID/TouchID
+
+- Suppose that the user has just been logged in to our application and has aquired some credentials.
+
+- Create an instance of the vault with a custom 'key' that will hold the credentials on the keychain. The key is just the name of the entry in the keychain. It shouldn't be anything special or an encryption key
+- Save the credentials to the keychain without any special security 
+```swift
+let vault = BiometricsVault<Credentials>(key: "biometrics_credentials")
+try vault.enableKeychainVault(saving: credentials)
+```
+- On app restart we can create an instance of the vault and check the state. If the state is 'keychainSecured' then we can retrieve the credentials
+```swift
+let vault = BiometricsVault<Credentials>(key: "biometrics_credentials")
+switch vault.state {
+case .keychainSecured(let credentials):
+    // we can login the user, validate the token, or any other operation we'd like
+default:
+    break
+}
+```
+- On logout just call reset
+```swift
+let vault = BiometricsVault<Credentials>(key: "biometrics_credentials")
+vault.reset()
+```
+
+### Upgrade to FaceID/TouchID
+
+- Once the user has been logged in, we can use the variable 'biometricsAvailable' to check if FaceID/TouchID can be enabled. If so, the add a button to your settings page.
+- Once the enable button is pressed, use the 'upgradeKeychainWithBiometrics' function to store the credentials using biometrics authentication
+
+```swift
+let vault = BiometricsVault<Credentials>(key: "biometrics_credentials")
+try await vault.upgradeKeychainWithBiometrics()
+```
+- The state now will be set to 'biometricsSecured' 
 
 
 ## States
