@@ -78,18 +78,11 @@ let vault = VaultFactory<MyCredentials>.retrieveVault(key: key)
 
 ```swift
     switch vault {
-    case .emptyWithBiometrics(let emptyVault):
-        // Go to login screen. Biometrics can be enabled upon login
-        displayLoginScreen(biometrics: true)
     case .empty(let vault):
-        // Go to login screen. Biometrics cannot be used
-        displayLoginScreen(biometrics: false)
+        // Go to login screen. Biometrics cannot be could
+        displayLoginScreen()
     case .keychain(let vault):
         // Log in the user right away and use the credentials from the vault to do so
-        displayMainScreen(credentials: vault.credentials)
-    case .keychainUpgradable(let vault):
-        // Log in the user right away and use the credentials from the vault to do so.
-        // The user can enabled the biometrics from the settings screen
         displayMainScreen(credentials: vault.credentials)
     case .biometrics(let vault):
         // Log in the user right away and use the credentials from the vault to do so.
