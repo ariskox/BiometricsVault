@@ -65,7 +65,7 @@ public extension Vault {
         case .biometrics(let vault):
             throw VaultError.invalid(vault)
         case .keychain(let vault):
-            throw VaultError.invalid(vault)
+            try await vault.upgradeWithBiometrics().wrap()
         case .locked(let vault):
             throw VaultError.invalid(vault)
         case .empty(let vault):
