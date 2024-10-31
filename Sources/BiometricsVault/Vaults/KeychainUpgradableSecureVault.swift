@@ -11,18 +11,18 @@ import Foundation
 
 public struct KeychainUpgradableSecureVault<Credentials: Codable & Sendable>: Sendable {
     private let keychainKey: String
-    private let _credentials: Credentials
     private let chain: KeychainCredentials<Credentials>
 
     init(key: String, storing credentials: Credentials) throws {
         self.keychainKey = key
         self.chain = KeychainCredentials<Credentials>(key: keychainKey, context: nil)
-        self._credentials = credentials
         try chain.store(credentials: credentials)
     }
 
     public var credentials: Credentials {
-        return _credentials
+        get throws {
+            return try chain.retrieve()
+        }
     }
 
     consuming public func upgradeWithBiometrics() async throws -> BiometricsSecureVault<Credentials> {

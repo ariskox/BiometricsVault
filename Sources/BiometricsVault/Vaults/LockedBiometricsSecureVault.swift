@@ -42,7 +42,7 @@ public struct LockedBiometricsSecureVault<Credentials: Codable & Sendable>: Send
         let helper = KeychainCredentials<Credentials>(key: keychainKey, context: context)
         let credentials = try helper.retrieve()
 
-        return try await BiometricsSecureVault<Credentials>(key: keychainKey, keeping: credentials)
+        return try await BiometricsSecureVault<Credentials>(key: keychainKey, context: context)
     }
 
     public func reauthenticateOwner() async throws -> Bool {

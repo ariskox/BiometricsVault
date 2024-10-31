@@ -8,19 +8,26 @@
 import SwiftUI
 import BiometricsVault
 
-struct Credentials: Codable, Sendable {
+struct AppCredentials: Codable, Sendable {
     let username: String
     let password: String
 
-    static var random: Credentials {
-        return Credentials(username: "user\(Int.random(in: 1...1000))",
+    static var random: AppCredentials {
+        return AppCredentials(username: "user\(Int.random(in: 1...1000))",
                            password: "pass\(Int.random(in: 1...1000))")
     }
 }
 
+protocol AppCredentialsVault {
+    var credentials: AppCredentials { get throws }
+}
+extension KeychainSecureVault: AppCredentialsVault where Credentials == AppCredentials {}
+extension KeychainUpgradableSecureVault: AppCredentialsVault where Credentials == AppCredentials {}
+extension BiometricsSecureVault: AppCredentialsVault where Credentials == AppCredentials {}
+
 struct ContentView: View {
-    @State var vault: Vault<Credentials>
-    @State private var credentials: Credentials?
+    @State var vault: Vault<AppCredentials>
+    @State private var credentials: AppCredentials?
     @State private var error: Error?
 
     private var errorTextOrNil: String {
@@ -79,7 +86,7 @@ struct ContentView: View {
                 Section {
                     Button("Login with mock credentials") {
                         runBlockAndSetError {
-                            self.vault = try vault.storeTokeychain(credentials: Credentials.random).wrap()
+                            self.vault = try vault.storeTokeychain(credentials: AppCredentials.random).wrap()
                         }
                     }
                 }
@@ -90,14 +97,14 @@ struct ContentView: View {
                 Section {
                     Button("Login with mock credentials") {
                         runBlockAndSetError {
-                            self.vault = try vault.storeTokeychain(credentials: Credentials.random).wrap()
+                            self.vault = try vault.storeTokeychain(credentials: AppCredentials.random).wrap()
                         }
                     }
                 }
                 Section {
                     Button("Login with mock credentials AND protect with FaceID in 1 step") {
                         runBlockAndSetErrorAsync {
-                            self.vault = try await vault.storeToBiometrics(credentials: Credentials.random).wrap()
+                            self.vault = try await vault.storeToBiometrics(credentials: AppCredentials.random).wrap()
                         }
                     }
                 }
@@ -109,7 +116,7 @@ struct ContentView: View {
             }
     }
 
-    @ViewBuilder private func lockedView(vault: LockedBiometricsSecureVault<Credentials>) -> some View {
+    @ViewBuilder private func lockedView(vault: LockedBiometricsSecureVault<AppCredentials>) -> some View {
         Section { Text("Logged In") }
         header: { Text("Status") }
         footer: { Text("Screen Locked. Expecting biometrics to unlock") }
@@ -142,17 +149,14 @@ struct ContentView: View {
         }
     }
 
-    @ViewBuilder private func keychainSecuredView(vault: KeychainSecureVault<Credentials>) -> some View {
+    @ViewBuilder private func keychainSecuredView(vault: KeychainSecureVault<AppCredentials>) -> some View {
         Section { Text("Logged in with keychain") }
         header: { Text("Status") }
         footer: {
             Text("You may restart the app to validate that the credentials are retrieved")
         }
 
-        Section {
-            Text("username: \(vault.credentials.username)")
-            Text("password: \(vault.credentials.password)")
-        }
+        credentialsSection(vault: vault)
 
         Section {
             Button("Reset Vault (Logout user)") {
@@ -162,7 +166,7 @@ struct ContentView: View {
         }
     }
 
-    @ViewBuilder private func keychainUpgradableSecuredView(vault: KeychainUpgradableSecureVault<Credentials>) -> some View {
+    @ViewBuilder private func keychainUpgradableSecuredView(vault: KeychainUpgradableSecureVault<AppCredentials>) -> some View {
         Section { Text("Logged in with keychain") }
         header: { Text("Status") }
         footer: {
@@ -173,15 +177,12 @@ struct ContentView: View {
                 .foregroundStyle(.red)
         }
 
-        Section {
-            Text("username: \(vault.credentials.username)")
-            Text("password: \(vault.credentials.password)")
-        }
+        credentialsSection(vault: vault)
 
         Section {
             Button("Update credentials") {
                 runBlockAndSetError {
-                    self.vault = try vault.update(credentials: Credentials.random).wrap()
+                    self.vault = try vault.update(credentials: AppCredentials.random).wrap()
                 }
             }
         }
@@ -208,7 +209,7 @@ struct ContentView: View {
         }
     }
 
-    @ViewBuilder private func biometricsSecured(vault: BiometricsSecureVault<Credentials>) -> some View {
+    @ViewBuilder private func biometricsSecured(vault: BiometricsSecureVault<AppCredentials>) -> some View {
         Section { Text("Logged in with biometrics enabled") }
         header: { Text("Status") }
         footer: {
@@ -220,15 +221,12 @@ struct ContentView: View {
                 .foregroundStyle(.red)
         }
 
-        Section {
-            Text("username: \(vault.credentials.username)")
-            Text("password: \(vault.credentials.password)")
-        }
+        credentialsSection(vault: vault)
 
         Section {
             Button("Update credentials") {
                 runBlockAndSetErrorAsync {
-                    self.vault = try await vault.update(credentials: Credentials.random).wrap()
+                    self.vault = try await vault.update(credentials: AppCredentials.random).wrap()
                 }
             }
         }
@@ -261,6 +259,13 @@ struct ContentView: View {
         }
     }
 
+    @ViewBuilder private func credentialsSection<V: AppCredentialsVault>(vault: V) -> some View {
+        Section {
+            Text("username: \((try? vault.credentials.username) ?? "Unavailable")")
+            Text("password: \((try? vault.credentials.password) ?? "Unavailable")")
+        }
+    }
+
     private func runBlockAndSetError(_ block: @escaping () throws -> Void) {
         do {
             try block()
@@ -270,6 +275,7 @@ struct ContentView: View {
             self.error = error
         }
     }
+
     private func runBlockAndSetErrorAsync(_ block: @escaping () async throws -> Void) {
         Task {
             do {

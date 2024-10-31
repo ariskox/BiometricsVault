@@ -12,21 +12,18 @@ import Foundation
 public struct BiometricsSecureVault<Credentials: Codable & Sendable>: Sendable {
     private let keychainKey: String
     private let context: LAContext
-    private let _credentials: Credentials
     private let chain: KeychainCredentials<Credentials>
 
     init(key: String, storing credentials: Credentials) async throws {
         self.keychainKey = key
         self.context = LAContext()
-        self._credentials = credentials
         self.chain = KeychainCredentials<Credentials>(key: keychainKey, context: context)
         try await store(credentials: credentials)
     }
 
-    init(key: String, keeping credentials: Credentials) async throws {
+    init(key: String, context: LAContext) async throws {
         self.keychainKey = key
-        self.context = LAContext()
-        self._credentials = credentials
+        self.context = context
         self.chain = KeychainCredentials<Credentials>(key: keychainKey, context: context)
     }
 
@@ -68,7 +65,9 @@ public struct BiometricsSecureVault<Credentials: Codable & Sendable>: Sendable {
     }
 
     public var credentials: Credentials {
-        return _credentials
+        get throws {
+            return try chain.retrieve()
+        }
     }
 
     consuming public func update(credentials: Credentials) async throws -> Self {
