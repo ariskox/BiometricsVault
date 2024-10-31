@@ -56,110 +56,116 @@ Add the `BiometricsVault` as a dependency to your target:
 
 ## Usage
 
-### Without FaceID/TouchID
+Fist, create a structure that is Codable and Sendable and will hold your credentials
 
-- Suppose that the user has just been logged in to our application and has aquired some credentials.
-
-- Create an instance of the vault with a custom 'key' that will hold the credentials on the keychain. The key is just the name of the entry in the keychain. It shouldn't be anything special or an encryption key
-- Save the credentials to the keychain without any special security 
 ```swift
-let vault = BiometricsVault<Credentials>(key: "biometrics_credentials")
-try vault.enableKeychainVault(saving: credentials)
-```
-- On app restart we can create an instance of the vault and check the state. If the state is 'keychainSecured' then we can retrieve the credentials
-```swift
-let vault = BiometricsVault<Credentials>(key: "biometrics_credentials")
-switch vault.state {
-case .keychainSecured(let credentials):
-    // we can login the user, validate the token, or any other operation we'd like
-default:
-    break
+struct MyCredentials: Codable, Sendable {
+    let username: String
+    let accessToken: String
 }
 ```
-- On logout just call reset
-```swift
-let vault = BiometricsVault<Credentials>(key: "biometrics_credentials")
-vault.resetEverything()
+
+On app startup, use the VaultFactory get a vault. This could be either an empty vault, a vault holding data or a locked vault
+
+``` swift
+let key = "my_app_credentials" // This key will be used to identify your credentials in the keychain
+let vault = VaultFactory<MyCredentials>.retrieveVault(key: key)
+
 ```
 
-### Upgrade to FaceID/TouchID
-
-- Once the user has been logged in, we can use the variable 'biometricsAvailable' to check if FaceID/TouchID can be enabled. If so, the add a button to your settings page.
-- Once the enable button is pressed, use the 'upgradeKeychainWithBiometrics' function to store the credentials using biometrics authentication
+Switch over the vault type to understand what kind of vault you have and you can decide whether to display a login page, a "biometrics lock" page, or log in the user right away.
 
 ```swift
-let vault = BiometricsVault<Credentials>(key: "biometrics_credentials")
-try await vault.upgradeKeychainWithBiometrics()
+    switch vault {
+    case .emptyWithBiometrics(let emptyVault):
+        // Go to login screen. Biometrics can be enabled upon login
+        displayLoginScreen(biometrics: true)
+    case .empty(let vault):
+        // Go to login screen. Biometrics cannot be used
+        displayLoginScreen(biometrics: false)
+    case .keychain(let vault):
+        // Log in the user right away and use the credentials from the vault to do so
+        displayMainScreen(credentials: vault.credentials)
+    case .keychainUpgradable(let vault):
+        // Log in the user right away and use the credentials from the vault to do so.
+        // The user can enabled the biometrics from the settings screen
+        displayMainScreen(credentials: vault.credentials)
+    case .biometrics(let vault):
+        // Log in the user right away and use the credentials from the vault to do so.
+        // The user can disable the biometrics from the settings screen
+        displayMainScreen(credentials: vault.credentials)
+    case .locked(let vault):
+        // Display a 'biometrics locked' screen and prompt the user to unlock using biometrics.
+        // Use 'vault.unlock' to unlock the vault
+        displayLockScreen(withVault: vault)
+        break
+    }
 ```
-- The state now will be set to 'biometricsSecured' and you'll need to check for this when starting up your app
-- You can use the 'lock' function to lock the vault. When the vault is locked you shouldn't keep the credentials in the memory anymore and the only screen you're allowed to display to the user is a 'Login with biometrics page' with a 'Login' button
-- When the user taps this 'Login' button, you should call 'unlockWithBiometrics' and you'll get the credentials back after a successfull authentication
 
-```swift
-let vault = BiometricsVault<Credentials>(key: "biometrics_credentials")
-let savedCredentials = try await vault.unlockWithBiometrics()
-```
-
-- When the user chooses to disable the FaceID/TouchID (and the vault isn't locked) you have two options. 
-    - To downgrade to simple keychain security -> Call downgradeBiometricsToKeychain()
-    - To forget the credentials -> Call disableBiometricsSecureVault
-
-### Login with credentials and remember with FaceID/TouchID
-
-- You want to use the function 'enableSecureVaultWithBiometrics' to transition from the 'ready' state to 'biometricsSecured'
+All operations that can be performed on the vaults are listed below
 
 ### Example
 
 For more information check the sample application at the directory [Example](https://github.com/ariskox/BiometricsVault/tree/main/Example)
 
-## States
+## Vaults
 
-- Unavailable
-    - The device or the application doesn't support authentication with biometrics.
-- Ready
-    - The Vault is ready to store the credentials to keychain with biometrics lock or unprotected
-    - No credentials exist in the keychain, so the user is logged out
-- ΒiometricsSecured
-    - The credentials have been stored to the keychain and are protected by biometrics. They ARE available to us, as the user has been authenticated with biometrics. 🔓
-    - The user is logged in and the credentials are available
-- Locked
-    - The credentials have been stored to the keychain and are protected by biometrics, but they are NOT available to us, UNLESS the user authenticates with biometrics first 🔒
-    - The user is presented a 'Login with biometrics' screen. He/she can press 'Login' or 'Change account' (reset)
-- KeychainSecured 
-    - The credentials have been stored to the keychain but THEY ARE NOT protected by biometrics
-    - The FaceID/TouchID have not been enabled. The user is logged in
+There are different kinds of vaults
+
+- EmptyVault
+    - A vault that doesn't actually stores any information but can be used to store credentials in the keychain.
+    - Calling 'storeToKeychain' returns a KeychainSecureVault
+- EmptyVaultWithBiometrics
+    - A vault that doesn't actually stores any information but can be used to store credentials in the keychain and/or protect them with biometrics
+    - Calling 'storeToKeychain' returns a KeychainUpgradableSecureVault
+    - Calling 'storeToBiometrics' returns a BiometricsSecureVault
+- KeychainSecureVault
+    - A vault that holds the credentials on the keychain without any biometrics protection. 
+    - Call 'update' to update the credentials
+    - Call 'reset' to delete the credentials and get an empty vault back
+- KeychainUpgradableSecureVault
+    - A vault that holds the credentials on the keychain without any biometrics protection but can be upgraded if required
+    - Call 'update' to update the credentials
+    - Call 'upgrade' to enable biometrics protection and get a BiometricsSecureVault back
+    - Call 'reset' to delete the credentials and get an empty vault with biometrics back
+- BiometricsSecureVault
+    - A vault that holds the credentials on the keychain WITH biometrics protection. Can be downgraded in required
+    - Call 'update' to update the credentials
+    - Call 'downgrade' to disable the biometrics protection and get a KeychainUpgradableSecureVault back
+    - Call 'reset' to delete the credentials and get an empty vault with biometrics back
+    - Call 'reauthenticateOwner' when unlock fails due to FaceID/TouchID being locked (Error: LAError.biometryLockout)
+- LockedBiometricsSecureVault 
+    - A vault that holds the credentials on the keychain WITH biometrics protection.
+    - The credentials aren't available until it is unlocked.
+    - Call 'unlock' to unlock the credentials and get a BiometricsSecureVault back
+    - Call 'reset' to delete the credentials and get an empty vault with biometrics back
+    - Call 'reauthenticateOwner' when unlock fails due to FaceID/TouchID being locked (Error: LAError.biometryLockout)
   
 ## State diagram
 
-### Simple state diagram
-
-A simple login flow that enables the FaceID/TouchID option from the settings is as follows:
+### All states and transitions
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Ready
-    Ready --> KeychainSecured: enableKeychainVault
-    KeychainSecured --> ΒiometricsSecured: upgradeKeychainWithBiometrics
-    ΒiometricsSecured --> Locked: lock
-    Locked --> ΒiometricsSecured: unlockWithBiometrics
-    ΒiometricsSecured --> Ready: disableBiometricsSecureVault
+    KeychainUpgradableSecureVault: KeychainUpgradableSecureVault*
+    BiometricsSecureVault: BiometricsSecureVault*
+    LockedBiometricsSecureVault: LockedBiometricsSecureVault*
+    KeychainSecureVault: LockedBiometricsSecureVault*
+
+    [*] --> EmptyVault: "Biometrics are disabled"
+    [*] --> BiometricsEnabled: "Biometrics are enabled"
+    EmptyVault --> KeychainSecureVault: storeTokeychain
+
+    BiometricsEnabled --> EmptyVaultWithBiometrics
+    EmptyVaultWithBiometrics --> KeychainUpgradableSecureVault: storeTokeychain
+    EmptyVaultWithBiometrics --> BiometricsSecureVault: storeToBiometrics
+    KeychainUpgradableSecureVault --> BiometricsSecureVault: upgradeWithBiometrics
+    BiometricsSecureVault --> KeychainUpgradableSecureVault: downgradeToKeychain
+    BiometricsSecureVault --> LockedBiometricsSecureVault: lock
+    LockedBiometricsSecureVault --> BiometricsSecureVault: unlock
 ```
 
-### Full diagram
-```mermaid
-stateDiagram-v2
-    [*] --> Ready
-    [*] --> Unavailable
-    Ready --> ΒiometricsSecured: enableSecureVaultWithBiometrics
-    ΒiometricsSecured --> Locked: lock
-    Locked --> ΒiometricsSecured: unlockWithBiometrics
-    Ready --> KeychainSecured: enableKeychainVault
-    KeychainSecured --> Ready: resetEverything
-    ΒiometricsSecured --> Ready: disableBiometricsSecureVault
-    ΒiometricsSecured --> KeychainSecured: downgradeBiometricsToKeychain
-    KeychainSecured --> ΒiometricsSecured: upgradeKeychainWithBiometrics
-    Locked --> Ready: resetEverything
-```
+> \* Calling 'reset' always deletes any saved credentials and returns an empty vault
 
 ## License
 

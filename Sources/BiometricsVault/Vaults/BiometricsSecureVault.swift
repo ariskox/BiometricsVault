@@ -70,6 +70,12 @@ public struct BiometricsSecureVault<Credentials: Codable & Sendable>: Sendable {
         }
     }
 
+    public func reauthenticateOwner() async throws -> Bool {
+        let context = LAContext()
+        let result = try await context.evaluatePolicy(.deviceOwnerAuthentication, localizedReason: NSLocalizedString("login_with_biometrics", comment: ""))
+        return result
+    }
+
     consuming public func update(credentials: Credentials) async throws -> Self {
         return try await BiometricsSecureVault<Credentials>(key: keychainKey, storing: credentials)
     }
