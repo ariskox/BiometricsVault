@@ -25,6 +25,34 @@ extension KeychainSecureVault: AppCredentialsVault where Credentials == AppCrede
 extension KeychainUpgradableSecureVault: AppCredentialsVault where Credentials == AppCredentials {}
 extension BiometricsSecureVault: AppCredentialsVault where Credentials == AppCredentials {}
 
+class Box<T>: ObservableObject {
+    @Published var value: T
+    init(value: consuming T) {
+        self.value = value
+    }
+}
+
+@MainActor
+extension Binding where Value == Vault<AppCredentials> {
+
+    func unlock() async throws {
+        try await wrappedValue.unlock()
+    }
+
+    func storeToBiometrics(credentials: AppCredentials) async throws {
+        try await wrappedValue.storeToBiometrics(credentials: credentials)
+    }
+
+    func update(credentials: AppCredentials) async throws {
+        try await wrappedValue.update(credentials: credentials)
+    }
+
+    func upgrade() async throws {
+        try await wrappedValue.upgrade()
+    }
+
+}
+
 struct ContentView: View {
     @State var vault: Vault<AppCredentials>
     @State private var credentials: AppCredentials?
@@ -86,7 +114,7 @@ struct ContentView: View {
                 Section {
                     Button("Login with mock credentials") {
                         runBlockAndSetError {
-                            self.vault = try vault.storeTokeychain(credentials: AppCredentials.random).wrap()
+                            try self.vault.storeToKeychain(credentials: AppCredentials.random)
                         }
                     }
                 }
@@ -97,14 +125,14 @@ struct ContentView: View {
                 Section {
                     Button("Login with mock credentials") {
                         runBlockAndSetError {
-                            self.vault = try vault.storeTokeychain(credentials: AppCredentials.random).wrap()
+                            try self.vault.storeToKeychain(credentials: AppCredentials.random)
                         }
                     }
                 }
                 Section {
                     Button("Login with mock credentials AND protect with FaceID in 1 step") {
                         runBlockAndSetErrorAsync {
-                            self.vault = try await vault.storeToBiometrics(credentials: AppCredentials.random).wrap()
+                            try await self.$vault.storeToBiometrics(credentials: AppCredentials.random)
                         }
                     }
                 }
@@ -124,8 +152,8 @@ struct ContentView: View {
         Section {
             Button("Login with biometrics (unlock)") {
                 Task {
-                    runBlockAndSetErrorAsync {
-                        self.vault = try await vault.unlock().wrap()
+                    runBlockAndSetErrorAsync { @MainActor in
+                        try await self.$vault.unlock()
                     }
                 }
             }
@@ -133,7 +161,7 @@ struct ContentView: View {
 
         Section {
             Button("Reset Vault (Logout user)")  {
-                self.vault = vault.reset()
+                self.vault.reset()
                 self.error = nil
             }
         }
@@ -160,7 +188,7 @@ struct ContentView: View {
 
         Section {
             Button("Reset Vault (Logout user)") {
-                self.vault = vault.reset()
+                self.vault.reset()
                 self.error = nil
             }
         }
@@ -181,8 +209,8 @@ struct ContentView: View {
 
         Section {
             Button("Update credentials") {
-                runBlockAndSetError {
-                    self.vault = try vault.update(credentials: AppCredentials.random).wrap()
+                runBlockAndSetErrorAsync {
+                    try await self.$vault.update(credentials: AppCredentials.random)
                 }
             }
         }
@@ -193,7 +221,7 @@ struct ContentView: View {
         Section {
             Button("Upgrade to biometrics (enable FaceID/TouchID)") {
                 runBlockAndSetErrorAsync {
-                    self.vault = try await vault.upgradeWithBiometrics().wrap()
+                    try await self.$vault.upgrade()
                 }
             }
         }
@@ -203,7 +231,7 @@ struct ContentView: View {
 
         Section {
             Button("Reset Vault (Logout user)") {
-                self.vault = vault.reset()
+                self.vault.reset()
                 self.error = nil
             }
         }
@@ -226,7 +254,7 @@ struct ContentView: View {
         Section {
             Button("Update credentials") {
                 runBlockAndSetErrorAsync {
-                    self.vault = try await vault.update(credentials: AppCredentials.random).wrap()
+                    try await self.$vault.update(credentials: AppCredentials.random)
                 }
             }
         }
@@ -237,7 +265,7 @@ struct ContentView: View {
         Section {
             Button("Disable FaceID/TouchID") {
                 runBlockAndSetError {
-                    self.vault = try vault.downgradeToKeychain().wrap()
+                    try self.vault.downgrade()
                 }
             }
         } footer: {
@@ -246,14 +274,16 @@ struct ContentView: View {
 
         Section {
             Button("Lock") {
-                self.vault = vault.lock().wrap()
+                runBlockAndSetError {
+                    try self.vault.lock()
+                }
             }
         }
 
         Section {
             Button("Logout user and disable FaceID/TouchID") {
                 runBlockAndSetError {
-                    self.vault = try vault.reset()
+                    self.vault.reset()
                 }
             }
         }
@@ -276,7 +306,7 @@ struct ContentView: View {
         }
     }
 
-    private func runBlockAndSetErrorAsync(_ block: @escaping () async throws -> Void) {
+    private func runBlockAndSetErrorAsync(_ block: @escaping @MainActor () async throws -> Void) {
         Task {
             do {
                 try await block()

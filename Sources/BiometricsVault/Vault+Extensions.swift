@@ -8,78 +8,44 @@
 import Foundation
 
 public extension Vault {
-    func reset() -> Vault {
-        switch self {
+    mutating func reset() {
+        switch consume self {
         case .biometrics(let vault):
-            return vault.reset()
+            self = vault.reset()
         case .keychain(let vault):
-            return vault.reset()
+            self = vault.reset()
         case .keychainUpgradable(let vault):
-            return vault.reset()
+            self = vault.reset()
         case .locked(let vault):
-            return vault.reset()
+            self = vault.reset()
         case .empty(let vault):
-            return vault.reset()
+            self = vault.reset()
         case .emptyWithBiometrics(let vault):
-            return vault.reset()
+            self = vault.reset()
         }
     }
 
-    func storeToKeychain(credentials: Credentials) throws -> Vault {
-        switch self {
-        case .biometrics(let vault):
-            throw VaultError.invalid(vault)
-        case .keychain(let vault):
-            throw VaultError.invalid(vault)
-        case .keychainUpgradable(let vault):
-            throw VaultError.invalid(vault)
-        case .locked(let vault):
-            throw VaultError.invalid(vault)
-        case .empty(let vault):
-            try vault.storeTokeychain(credentials: credentials).wrap()
-        case .emptyWithBiometrics(let vault):
-            try vault.storeTokeychain(credentials: credentials).wrap()
-        }
-    }
-
-    func update(credentials: Credentials) async throws -> Vault {
-        switch self {
-        case .biometrics(let vault):
-            try await vault.update(credentials: credentials).wrap()
-        case .keychain(let vault):
-            try vault.update(credentials: credentials).wrap()
-        case .keychainUpgradable(let vault):
-            try vault.update(credentials: credentials).wrap()
-        case .locked(let vault):
-            throw VaultError.invalid(vault)
-        case .empty(let vault):
-            throw VaultError.invalid(vault)
-        case .emptyWithBiometrics(let vault):
-            throw VaultError.invalid(vault)
-        }
-    }
-
-    func upgrade() async throws -> Vault {
+    mutating func storeToKeychain(credentials: Credentials) throws {
         switch self {
         case .biometrics(let vault):
             throw VaultError.invalid(vault)
         case .keychain(let vault):
             throw VaultError.invalid(vault)
         case .keychainUpgradable(let vault):
-            try await vault.upgradeWithBiometrics().wrap()
+            throw VaultError.invalid(vault)
         case .locked(let vault):
             throw VaultError.invalid(vault)
         case .empty(let vault):
-            throw VaultError.invalid(vault)
+            self = try vault.storeTokeychain(credentials: credentials).wrap()
         case .emptyWithBiometrics(let vault):
-            throw VaultError.invalid(vault)
+            self = try vault.storeTokeychain(credentials: credentials).wrap()
         }
     }
 
-    func downgrade() throws -> Vault {
+    mutating func storeToBiometrics(credentials: Credentials) async throws {
         switch self {
         case .biometrics(let vault):
-            try vault.downgradeToKeychain().wrap()
+            throw VaultError.invalid(vault)
         case .keychain(let vault):
             throw VaultError.invalid(vault)
         case .keychainUpgradable(let vault):
@@ -89,14 +55,48 @@ public extension Vault {
         case .empty(let vault):
             throw VaultError.invalid(vault)
         case .emptyWithBiometrics(let vault):
+            self = try await vault.storeToBiometrics(credentials: credentials).wrap()
+        }
+    }
+
+    mutating func update(credentials: Credentials) async throws {
+        switch self {
+        case .biometrics(let vault):
+            self = try await vault.update(credentials: credentials).wrap()
+        case .keychain(let vault):
+            self = try vault.update(credentials: credentials).wrap()
+        case .keychainUpgradable(let vault):
+            self = try vault.update(credentials: credentials).wrap()
+        case .locked(let vault):
+            throw VaultError.invalid(vault)
+        case .empty(let vault):
+            throw VaultError.invalid(vault)
+        case .emptyWithBiometrics(let vault):
             throw VaultError.invalid(vault)
         }
     }
 
-    func lock() throws -> Vault {
+    mutating func upgrade() async throws {
         switch self {
         case .biometrics(let vault):
-            return vault.lock().wrap()
+            throw VaultError.invalid(vault)
+        case .keychain(let vault):
+            throw VaultError.invalid(vault)
+        case .keychainUpgradable(let vault):
+            self = try await vault.upgradeWithBiometrics().wrap()
+        case .locked(let vault):
+            throw VaultError.invalid(vault)
+        case .empty(let vault):
+            throw VaultError.invalid(vault)
+        case .emptyWithBiometrics(let vault):
+            throw VaultError.invalid(vault)
+        }
+    }
+
+    mutating func downgrade() throws {
+        switch self {
+        case .biometrics(let vault):
+            self = try vault.downgradeToKeychain().wrap()
         case .keychain(let vault):
             throw VaultError.invalid(vault)
         case .keychainUpgradable(let vault):
@@ -110,7 +110,24 @@ public extension Vault {
         }
     }
 
-    func unlock() async throws -> Vault {
+    mutating func lock() throws {
+        switch self {
+        case .biometrics(let vault):
+            self = vault.lock().wrap()
+        case .keychain(let vault):
+            throw VaultError.invalid(vault)
+        case .keychainUpgradable(let vault):
+            throw VaultError.invalid(vault)
+        case .locked(let vault):
+            throw VaultError.invalid(vault)
+        case .empty(let vault):
+            throw VaultError.invalid(vault)
+        case .emptyWithBiometrics(let vault):
+            throw VaultError.invalid(vault)
+        }
+    }
+
+    mutating func unlock() async throws {
         switch self {
         case .biometrics(let vault):
             throw VaultError.invalid(vault)
@@ -119,7 +136,7 @@ public extension Vault {
         case .keychainUpgradable(let vault):
             throw VaultError.invalid(vault)
         case .locked(let vault):
-            return try await vault.unlock().wrap()
+            self = try await vault.unlock().wrap()
         case .empty(let vault):
             throw VaultError.invalid(vault)
         case .emptyWithBiometrics(let vault):
@@ -165,9 +182,17 @@ public extension Vault {
 
     var biometricsEnabled: Bool {
         switch self {
-        case .biometrics, .locked:
+        case .biometrics:
             return true
-        case .keychain, .keychainUpgradable, .empty, .emptyWithBiometrics:
+        case .locked:
+            return true
+        case .keychain:
+            return false
+        case .keychainUpgradable:
+            return false
+        case .empty:
+            return false
+        case .emptyWithBiometrics:
             return false
         }
 
@@ -175,10 +200,18 @@ public extension Vault {
 
     var biometricsAvailable: Bool {
         switch self {
-        case .biometrics, .keychainUpgradable, .emptyWithBiometrics, .locked:
+        case .biometrics:
             return true
-        case .keychain,.empty:
+        case .locked:
+            return true
+        case .keychain:
             return false
+        case .keychainUpgradable:
+            return true
+        case .empty:
+            return false
+        case .emptyWithBiometrics:
+            return true
         }
     }
 }
