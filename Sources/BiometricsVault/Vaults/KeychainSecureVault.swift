@@ -13,21 +13,25 @@ import Foundation
 public struct KeychainSecureVault<Credentials: Codable> {
     private let keychainKey: String
     private let _credentials: Credentials
-    
+    private let chain: KeychainCredentials<Credentials>
+
     init(key: String, storing credentials: Credentials) throws {
         self.keychainKey = key
         self._credentials = credentials
-        let helper = KeychainCredentials<Credentials>(key: keychainKey, context: nil)
-        try helper.store(credentials: credentials)
+        self.chain = KeychainCredentials<Credentials>(key: keychainKey, context: nil)
+        try chain.store(credentials: credentials)
     }
 
     public var credentials: Credentials {
         return _credentials
     }
 
+    consuming public func update(credentials: Credentials) throws -> Self {
+        return try KeychainSecureVault<Credentials>(key: keychainKey, storing: credentials)
+    }
+
     consuming public func reset() -> Vault<Credentials> {
-        let keychain = KeychainCredentials<Credentials>(key: keychainKey, context: nil)
-        try? keychain.delete()
+        try? chain.delete()
         return VaultFactory.retrieveVault(key: keychainKey)
     }
 

@@ -14,11 +14,13 @@ public struct BiometricsSecureVault<Credentials: Codable> {
     private let keychainKey: String
     private let context: LAContext
     private let _credentials: Credentials
+    private let chain: KeychainCredentials<Credentials>
 
     init(key: String, storing credentials: Credentials) async throws {
         self.keychainKey = key
         self.context = LAContext()
         self._credentials = credentials
+        self.chain = KeychainCredentials<Credentials>(key: keychainKey, context: context)
         try await store(credentials: credentials)
     }
 
@@ -26,11 +28,15 @@ public struct BiometricsSecureVault<Credentials: Codable> {
         self.keychainKey = key
         self.context = LAContext()
         self._credentials = credentials
+        self.chain = KeychainCredentials<Credentials>(key: keychainKey, context: context)
     }
 
     private func store(credentials: Credentials) async throws {
         var error: NSError?
-        let canEvaluate = context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error)
+        let canEvaluate = context.canEvaluatePolicy(
+            .deviceOwnerAuthenticationWithBiometrics,
+            error: &error
+        )
 
         guard canEvaluate else {
             if let error {
@@ -40,41 +46,46 @@ public struct BiometricsSecureVault<Credentials: Codable> {
             }
         }
 
-        let _ = try await context.evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, localizedReason: NSLocalizedString("login_with_biometrics", comment: ""))
+        let _ = try await context.evaluatePolicy(
+            .deviceOwnerAuthenticationWithBiometrics,
+            localizedReason: NSLocalizedString("login_with_biometrics", comment: "")
+        )
 
         let accessControl = getBioSecAccessControl()
-        let result = try await context.evaluateAccessControl(accessControl,
-                                                             operation: .createItem,
-                                                             localizedReason: NSLocalizedString("login_with_biometrics", comment: ""))
+        let result = try await context.evaluateAccessControl(
+            accessControl,
+            operation: .createItem,
+            localizedReason: NSLocalizedString("login_with_biometrics", comment: "")
+        )
 
         guard result else {
             throw VaultError.storingFailure
         }
 
-        let unsecuredKeychain = KeychainCredentials<Credentials>(key: keychainKey, context: nil)
-        // Don't care about the error
-        try? unsecuredKeychain.delete()
+        // Delete old credentials. Don't care about the error
+        try? chain.delete()
 
-        let helper = KeychainCredentials<Credentials>(key: keychainKey, context: context)
-        try helper.store(credentials: credentials)
+        try chain.store(credentials: credentials)
     }
 
     public var credentials: Credentials {
         return _credentials
     }
 
-    consuming public func downgradeToKeychain() throws -> KeychainUpgradableSecureVault<Credentials> {
-        let secureKeychain = KeychainCredentials<Credentials>(key: keychainKey, context: context)
-        let existing = try secureKeychain.retrieve()
+    consuming public func update(credentials: Credentials) async throws -> Self {
+        return try await BiometricsSecureVault<Credentials>(key: keychainKey, storing: credentials)
+    }
 
-        try? secureKeychain.delete()
+    consuming public func downgradeToKeychain() throws -> KeychainUpgradableSecureVault<Credentials> {
+        let existing = try chain.retrieve()
+
+        try? chain.delete()
 
         return try KeychainUpgradableSecureVault(key: keychainKey, storing: existing)
     }
 
     consuming public func reset() throws -> Vault<Credentials> {
-        let keychain = KeychainCredentials<Credentials>(key: keychainKey, context: nil)
-        try? keychain.delete()
+        try? chain.delete()
         return VaultFactory.retrieveVault(key: keychainKey)
     }
 

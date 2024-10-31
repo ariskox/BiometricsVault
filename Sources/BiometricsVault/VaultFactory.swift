@@ -25,6 +25,9 @@ public class VaultFactory<Credentials: Codable> {
             }
         } catch let keychainError as SimpleKeychainError where keychainError == .interactionNotAllowed {
             return .locked(LockedBiometricsSecureVault<Credentials>(key: key))
+        } catch let keychainError as SimpleKeychainError where keychainError == .authFailed {
+            // TouchID/FaceID possibly locked
+            return .locked(LockedBiometricsSecureVault<Credentials>(key: key))
         } catch {
             if biometricsAvailable {
                 return .emptyWithBiometrics(EmptyVaultWithBiometrics<Credentials>(key: key))

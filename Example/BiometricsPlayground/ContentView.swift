@@ -11,13 +11,10 @@ import BiometricsVault
 struct Credentials: Codable {
     let username: String
     let password: String
-}
 
-struct SampleError: Error, LocalizedError {
-    let message: String
-
-    var errorDescription: String? {
-        return message
+    static var random: Credentials {
+        return Credentials(username: "user\(Int.random(in: 1...1000))",
+                           password: "pass\(Int.random(in: 1...1000))")
     }
 }
 
@@ -27,8 +24,22 @@ struct ContentView: View {
     @State private var error: Error?
 
     private var errorTextOrNil: String {
-        guard let error = error else { return "" }
+        guard let error = error else { return "No error" }
         return "Error: \(error.localizedDescription)"
+    }
+
+    private var errorDebugDescription: String {
+        guard let error = error else { return "" }
+        guard let debugDescription = (error as NSError).userInfo["NSDebugDescription"] as? String else { return "" }
+        return debugDescription
+    }
+
+    private var biometricsFooter: String {
+#if targetEnvironment(simulator)
+        return "Biometrics will not work on Simulator even if you enable FaceID/TouchID. Please run on device"
+#else
+        return ""
+#endif
     }
 
     init() {
@@ -36,13 +47,10 @@ struct ContentView: View {
     }
     
     var body: some View {
-        VStack {
-            Spacer()
+        List {
             switch vault {
-            case .empty(let vault):
-                emptyNoBiometrics(vault: vault)
-            case .emptyWithBiometrics(let vault):
-                emptyWithBiometris(vault: vault)
+            case .empty, .emptyWithBiometrics:
+                emptyVaults()
             case .keychain(let vault):
                 keychainSecuredView(vault: vault)
             case .keychainUpgradable(let vault):
@@ -52,172 +60,205 @@ struct ContentView: View {
             case .locked(let vault):
                 lockedView(vault: vault)
             }
-            Spacer()
 
-            Text(errorTextOrNil)
-                .foregroundColor(error == nil ? .primary : .red)
-                .padding(20)
-                .border(error == nil ? Color.clear: Color.red, width: 1)
-
-        }
-        .padding()
-    }
-
-    @ViewBuilder private var unavailableView: some View {
-        VStack(spacing: 40) {
-
-            Text("Biometrics are not available")
-            Text("Enable and restart the app")
-            Text("Don't use the simulator for this sample application")
-                .bold()
-                .foregroundStyle(.red)
+            Section {
+                Text(errorTextOrNil)
+                    .foregroundColor(error == nil ? .primary : .red)
+            }
+            header: { Text("Error status") }
+            footer: { Text(errorDebugDescription) }
         }
     }
 
-    @ViewBuilder private func emptyNoBiometrics(vault: EmptyVault<Credentials>) -> some View {
-        VStack(spacing: 40) {
-            Text("You are now ready to login")
-            Button(action: {
-                let credentials = Credentials(
-                    username: "user\(Int.random(in: 1...1000))",
-                    password: "pass\(Int.random(in: 1...1000))")
-                runBlockAndSetError {
-                    self.vault = try vault.storeTokeychain(credentials: credentials).wrap()
+    @ViewBuilder private func emptyVaults() -> some View {
+        Section { Text("Logged out") }
+        header: { Text("Status") }
+
+            switch vault {
+            case .empty(let vault):
+                Section {
+                    Button("Login with mock credentials") {
+                        runBlockAndSetError {
+                            self.vault = try vault.storeTokeychain(credentials: Credentials.random).wrap()
+                        }
+                    }
                 }
-            }) { Text("Login with mock credentials") }
-
-        }
-    }
-
-    @ViewBuilder private func emptyWithBiometris(vault: EmptyVaultWithBiometrics<Credentials>) -> some View {
-        VStack(spacing: 40) {
-            Text("You are now ready to login")
-            Button(action: {
-                let credentials = Credentials(
-                    username: "user\(Int.random(in: 1...1000))",
-                    password: "pass\(Int.random(in: 1...1000))")
-                runBlockAndSetError {
-                    self.vault = try vault.storeTokeychain(credentials: credentials).wrap()
+                footer: {
+                    Text("Biometrics unavailable (Simulator or FaceID/TouchID is disabled)")
                 }
-            }) { Text("Login with mock credentials") }
-
-            Button(action: {
-                let credentials = Credentials(
-                    username: "user\(Int.random(in: 1...1000))",
-                    password: "pass\(Int.random(in: 1...1000))")
-                runBlockAndSetErrorAsync {
-                    self.vault = try await vault.storeToBiometrics(credentials: credentials).wrap()
+            case .emptyWithBiometrics(let vault):
+                Section {
+                    Button("Login with mock credentials") {
+                        runBlockAndSetError {
+                            self.vault = try vault.storeTokeychain(credentials: Credentials.random).wrap()
+                        }
+                    }
                 }
-            }) { Text("Login with mock credentials AND protect with FaceID in 1 step") }
-
-        }
+                Section {
+                    Button("Login with mock credentials AND protect with FaceID in 1 step") {
+                        runBlockAndSetErrorAsync {
+                            self.vault = try await vault.storeToBiometrics(credentials: Credentials.random).wrap()
+                        }
+                    }
+                }
+                footer: {
+                    Text(biometricsFooter)
+                }
+            default:
+                fatalError()
+            }
     }
 
     @ViewBuilder private func lockedView(vault: LockedBiometricsSecureVault<Credentials>) -> some View {
-        VStack(spacing: 40) {
-            Text("Biometrics are locked")
-            Button(action: {
+        Section { Text("Logged In") }
+        header: { Text("Status") }
+        footer: { Text("Screen Locked. Expecting biometrics to unlock") }
+
+        Section {
+            Button("Login with biometrics (unlock)") {
                 Task {
                     runBlockAndSetErrorAsync {
                         self.vault = try await vault.unlock().wrap()
                     }
                 }
-            }) { Text("Login with biometrics (unlock)") }
+            }
+        }
 
-            Button(action: {
+        Section {
+            Button("Reset Vault (Logout user)")  {
+                self.vault = vault.reset()
+                self.error = nil
+            }
+        }
+
+        Section {
+            Button("Reauthenticate owner") {
                 runBlockAndSetErrorAsync {
                     let _ = try await vault.reauthenticateOwner()
                 }
-                self.error = nil
-            }) { Text("Reauthenticate owned (if FaceID is locked due to multiple retries)") }
-
-            Button(action: {
-                self.vault = vault.reset()
-                self.error = nil
-            }) { Text("Reset Vault (Logout user)").foregroundStyle(.red) }
+            }
+        } footer: {
+            Text("Necessary after entering wrong FaceID/TouchID multiple times")
         }
     }
 
     @ViewBuilder private func keychainSecuredView(vault: KeychainSecureVault<Credentials>) -> some View {
-        VStack(spacing: 40) {
-            Text("You are logged in with keychain (no biometrics)")
+        Section { Text("Logged in with keychain") }
+        header: { Text("Status") }
+        footer: {
             Text("You may restart the app to validate that the credentials are retrieved")
-            Text("Use a device to test. Simulator will not work for this feature")
-                .bold()
-                .font(.caption)
-                .foregroundStyle(.red)
+        }
 
-            HStack {
-                Text("username: \(vault.credentials.username)")
-                Text("password: \(vault.credentials.password)")
-            }
+        Section {
+            Text("username: \(vault.credentials.username)")
+            Text("password: \(vault.credentials.password)")
+        }
 
-            Button(action: {
+        Section {
+            Button("Reset Vault (Logout user)") {
                 self.vault = vault.reset()
                 self.error = nil
-            }) { Text("Reset Vault (Logout user)").foregroundStyle(.red) }
+            }
         }
     }
 
     @ViewBuilder private func keychainUpgradableSecuredView(vault: KeychainUpgradableSecureVault<Credentials>) -> some View {
-        VStack(spacing: 40) {
-            Text("You are logged in with keychain (no biometrics)")
+        Section { Text("Logged in with keychain") }
+        header: { Text("Status") }
+        footer: {
             Text("You may restart the app to validate that the credentials are retrieved")
             Text("Use a device to test. Simulator will not work for this feature")
                 .bold()
                 .font(.caption)
                 .foregroundStyle(.red)
+        }
 
-            HStack {
-                Text("username: \(vault.credentials.username)")
-                Text("password: \(vault.credentials.password)")
+        Section {
+            Text("username: \(vault.credentials.username)")
+            Text("password: \(vault.credentials.password)")
+        }
+
+        Section {
+            Button("Update credentials") {
+                runBlockAndSetError {
+                    self.vault = try vault.update(credentials: Credentials.random).wrap()
+                }
             }
+        }
+        footer: {
+            Text("Normally activated when user changes password, access token, etc")
+        }
 
-            Button(action: {
+        Section {
+            Button("Upgrade to biometrics (enable FaceID/TouchID)") {
                 runBlockAndSetErrorAsync {
                     self.vault = try await vault.upgradeWithBiometrics().wrap()
                 }
-            }) { Text("Upgrade to biometrics (enable FaceID)") }
+            }
+        }
+        footer:  {
+            Text("Enables biometrics and keeps you logged in. \(biometricsFooter)")
+        }
 
-            Button(action: {
+        Section {
+            Button("Reset Vault (Logout user)") {
                 self.vault = vault.reset()
                 self.error = nil
-            }) { Text("Reset Vault (Logout user)").foregroundStyle(.red) }
+            }
         }
     }
 
-
     @ViewBuilder private func biometricsSecured(vault: BiometricsSecureVault<Credentials>) -> some View {
-        VStack(spacing: 40) {
+        Section { Text("Logged in with biometrics enabled") }
+        header: { Text("Status") }
+        footer: {
             Text("You are logged in and biometrics are enabled (unlocked)")
             Text("You may restart the app to validate that the credentials are retrieved")
             Text("Use a device to test. Simulator will not work for this feature")
                 .bold()
                 .font(.caption)
                 .foregroundStyle(.red)
+        }
 
-            HStack {
-                Text("username: \(vault.credentials.username)")
-                Text("password: \(vault.credentials.password)")
+        Section {
+            Text("username: \(vault.credentials.username)")
+            Text("password: \(vault.credentials.password)")
+        }
+
+        Section {
+            Button("Update credentials") {
+                runBlockAndSetErrorAsync {
+                    self.vault = try await vault.update(credentials: Credentials.random).wrap()
+                }
             }
+        }
+        footer: {
+            Text("Normally activated when user changes password, access token, etc")
+        }
 
-            Button(action: {
+        Section {
+            Button("Disable FaceID/TouchID") {
                 runBlockAndSetError {
                     self.vault = try vault.downgradeToKeychain().wrap()
                 }
-            }) { Text("Disable FaceID/TouchID") }
+            }
+        } footer: {
+            Text("Biometrics will be disabled but you will remain logged in")
+        }
 
-            Button(action: {
+        Section {
+            Button("Lock") {
                 self.vault = vault.lock().wrap()
-            }) { Text("Lock") }
+            }
+        }
 
-            Button(action: {
+        Section {
+            Button("Logout user and disable FaceID/TouchID") {
                 runBlockAndSetError {
                     self.vault = try vault.reset()
                 }
-            }) { Text("Logout user with FaceID").foregroundStyle(.red) }
+            }
         }
-
     }
 
     private func runBlockAndSetError(_ block: @escaping () throws -> Void) {

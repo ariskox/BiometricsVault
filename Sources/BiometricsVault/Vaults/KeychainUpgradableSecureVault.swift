@@ -13,12 +13,13 @@ import Foundation
 public struct KeychainUpgradableSecureVault<Credentials: Codable> {
     private let keychainKey: String
     private let _credentials: Credentials
+    private let chain: KeychainCredentials<Credentials>
 
     init(key: String, storing credentials: Credentials) throws {
         self.keychainKey = key
+        self.chain = KeychainCredentials<Credentials>(key: keychainKey, context: nil)
         self._credentials = credentials
-        let helper = KeychainCredentials<Credentials>(key: keychainKey, context: nil)
-        try helper.store(credentials: credentials)
+        try chain.store(credentials: credentials)
     }
 
     public var credentials: Credentials {
@@ -26,14 +27,16 @@ public struct KeychainUpgradableSecureVault<Credentials: Codable> {
     }
 
     consuming public func upgradeWithBiometrics() async throws -> BiometricsSecureVault<Credentials> {
-        let helper = KeychainCredentials<Credentials>(key: keychainKey, context: nil)
-        let credentials = try helper.retrieve()
+        let credentials = try chain.retrieve()
         return try await BiometricsSecureVault<Credentials>(key: keychainKey, storing: credentials)
     }
 
+    consuming public func update(credentials: Credentials) throws -> Self {
+        return try KeychainUpgradableSecureVault<Credentials>(key: keychainKey, storing: credentials)
+    }
+
     consuming public func reset() -> Vault<Credentials> {
-        let keychain = KeychainCredentials<Credentials>(key: keychainKey, context: nil)
-        try? keychain.delete()
+        try? chain.delete()
         return VaultFactory.retrieveVault(key: keychainKey)
     }
 
