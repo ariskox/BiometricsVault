@@ -14,13 +14,9 @@ public extension Vault {
             return vault.reset()
         case .keychain(let vault):
             return vault.reset()
-        case .keychainUpgradable(let vault):
-            return vault.reset()
         case .locked(let vault):
             return vault.reset()
         case .empty(let vault):
-            return vault.reset()
-        case .emptyWithBiometrics(let vault):
             return vault.reset()
         }
     }
@@ -31,14 +27,10 @@ public extension Vault {
             throw VaultError.invalid(vault)
         case .keychain(let vault):
             throw VaultError.invalid(vault)
-        case .keychainUpgradable(let vault):
-            throw VaultError.invalid(vault)
         case .locked(let vault):
             throw VaultError.invalid(vault)
         case .empty(let vault):
-            try vault.storeTokeychain(credentials: credentials).wrap()
-        case .emptyWithBiometrics(let vault):
-            try vault.storeTokeychain(credentials: credentials).wrap()
+            try vault.storeToKeychain(credentials: credentials).wrap()
         }
     }
 
@@ -48,13 +40,9 @@ public extension Vault {
             try await vault.update(credentials: credentials).wrap()
         case .keychain(let vault):
             try vault.update(credentials: credentials).wrap()
-        case .keychainUpgradable(let vault):
-            try vault.update(credentials: credentials).wrap()
         case .locked(let vault):
             throw VaultError.invalid(vault)
         case .empty(let vault):
-            throw VaultError.invalid(vault)
-        case .emptyWithBiometrics(let vault):
             throw VaultError.invalid(vault)
         }
     }
@@ -65,13 +53,9 @@ public extension Vault {
             throw VaultError.invalid(vault)
         case .keychain(let vault):
             throw VaultError.invalid(vault)
-        case .keychainUpgradable(let vault):
-            try await vault.upgradeWithBiometrics().wrap()
         case .locked(let vault):
             throw VaultError.invalid(vault)
         case .empty(let vault):
-            throw VaultError.invalid(vault)
-        case .emptyWithBiometrics(let vault):
             throw VaultError.invalid(vault)
         }
     }
@@ -82,13 +66,9 @@ public extension Vault {
             try vault.downgradeToKeychain().wrap()
         case .keychain(let vault):
             throw VaultError.invalid(vault)
-        case .keychainUpgradable(let vault):
-            throw VaultError.invalid(vault)
         case .locked(let vault):
             throw VaultError.invalid(vault)
         case .empty(let vault):
-            throw VaultError.invalid(vault)
-        case .emptyWithBiometrics(let vault):
             throw VaultError.invalid(vault)
         }
     }
@@ -99,13 +79,9 @@ public extension Vault {
             return vault.lock().wrap()
         case .keychain(let vault):
             throw VaultError.invalid(vault)
-        case .keychainUpgradable(let vault):
-            throw VaultError.invalid(vault)
         case .locked(let vault):
             throw VaultError.invalid(vault)
         case .empty(let vault):
-            throw VaultError.invalid(vault)
-        case .emptyWithBiometrics(let vault):
             throw VaultError.invalid(vault)
         }
     }
@@ -116,13 +92,9 @@ public extension Vault {
             throw VaultError.invalid(vault)
         case .keychain(let vault):
             throw VaultError.invalid(vault)
-        case .keychainUpgradable(let vault):
-            throw VaultError.invalid(vault)
         case .locked(let vault):
             return try await vault.unlock().wrap()
         case .empty(let vault):
-            throw VaultError.invalid(vault)
-        case .emptyWithBiometrics(let vault):
             throw VaultError.invalid(vault)
         }
     }
@@ -133,13 +105,9 @@ public extension Vault {
             return try await vault.reauthenticateOwner()
         case .keychain(let vault):
             throw VaultError.invalid(vault)
-        case .keychainUpgradable(let vault):
-            throw VaultError.invalid(vault)
         case .locked(let vault):
             return try await vault.reauthenticateOwner()
         case .empty(let vault):
-            throw VaultError.invalid(vault)
-        case .emptyWithBiometrics(let vault):
             throw VaultError.invalid(vault)
         }
     }
@@ -151,13 +119,9 @@ public extension Vault {
                 try vault.credentials
             case .keychain(let vault):
                 try vault.credentials
-            case .keychainUpgradable(let vault):
-                try vault.credentials
             case .locked(let vault):
                 throw VaultError.invalid(vault)
             case .empty(let vault):
-                throw VaultError.invalid(vault)
-            case .emptyWithBiometrics(let vault):
                 throw VaultError.invalid(vault)
             }
         }
@@ -167,18 +131,9 @@ public extension Vault {
         switch self {
         case .biometrics, .locked:
             return true
-        case .keychain, .keychainUpgradable, .empty, .emptyWithBiometrics:
+        case .keychain, .empty:
             return false
         }
 
-    }
-
-    var biometricsAvailable: Bool {
-        switch self {
-        case .biometrics, .keychainUpgradable, .emptyWithBiometrics, .locked:
-            return true
-        case .keychain,.empty:
-            return false
-        }
     }
 }

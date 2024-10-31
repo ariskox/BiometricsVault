@@ -25,6 +25,11 @@ public struct KeychainSecureVault<Credentials: Codable & Sendable>: Sendable {
         }
     }
 
+    public func upgradeWithBiometrics() async throws -> BiometricsSecureVault<Credentials> {
+        let credentials = try chain.retrieve()
+        return try await BiometricsSecureVault<Credentials>(key: keychainKey, storing: credentials)
+    }
+
     public func update(credentials: Credentials) throws -> Self {
         return try KeychainSecureVault<Credentials>(key: keychainKey, storing: credentials)
     }

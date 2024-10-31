@@ -17,30 +17,15 @@ public struct VaultFactory<Credentials: Codable & Sendable> {
 
         do {
             let credentials = try helper.retrieve()
-            if biometricsAvailable {
-                return .keychainUpgradable(try KeychainUpgradableSecureVault<Credentials>(key: key, storing: credentials))
-            } else {
-                return .keychain(try KeychainSecureVault<Credentials>(key: key, storing: credentials))
-            }
+            return .keychain(try KeychainSecureVault<Credentials>(key: key, storing: credentials))
         } catch let keychainError as SimpleKeychainError where keychainError == .interactionNotAllowed {
             return .locked(LockedBiometricsSecureVault<Credentials>(key: key))
         } catch let keychainError as SimpleKeychainError where keychainError == .authFailed {
             // TouchID/FaceID possibly locked
             return .locked(LockedBiometricsSecureVault<Credentials>(key: key))
         } catch {
-            if biometricsAvailable {
-                return .emptyWithBiometrics(EmptyVaultWithBiometrics<Credentials>(key: key))
-            } else {
-                return .empty(EmptyVault<Credentials>(key: key))
-            }
+            return .empty(EmptyVault<Credentials>(key: key))
         }
-    }
-
-    static var biometricsAvailable: Bool {
-        let context = LAContext()
-        var error: NSError?
-
-        return context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error)
     }
 
 }

@@ -22,7 +22,6 @@ protocol AppCredentialsVault {
     var credentials: AppCredentials { get throws }
 }
 extension KeychainSecureVault: AppCredentialsVault where Credentials == AppCredentials {}
-extension KeychainUpgradableSecureVault: AppCredentialsVault where Credentials == AppCredentials {}
 extension BiometricsSecureVault: AppCredentialsVault where Credentials == AppCredentials {}
 
 struct ContentView: View {
@@ -45,7 +44,7 @@ struct ContentView: View {
 #if targetEnvironment(simulator)
         return "Biometrics will not work on Simulator even if you enable FaceID/TouchID. Please run on device"
 #else
-        return ""
+        return BiometricsVault.biometricsAvailable ? "Biometrics available" : "Biometrics not available"
 #endif
     }
 
@@ -56,12 +55,10 @@ struct ContentView: View {
     var body: some View {
         List {
             switch vault {
-            case .empty, .emptyWithBiometrics:
-                emptyVaults()
+            case .empty(let vault):
+                emptyVault(vault: vault)
             case .keychain(let vault):
                 keychainSecuredView(vault: vault)
-            case .keychainUpgradable(let vault):
-                keychainUpgradableSecuredView(vault: vault)
             case .biometrics(let vault):
                 biometricsSecured(vault: vault)
             case .locked(let vault):
@@ -77,43 +74,28 @@ struct ContentView: View {
         }
     }
 
-    @ViewBuilder private func emptyVaults() -> some View {
+    @ViewBuilder private func emptyVault(vault: EmptyVault<AppCredentials>) -> some View {
         Section { Text("Logged out") }
         header: { Text("Status") }
 
-            switch vault {
-            case .empty(let vault):
-                Section {
-                    Button("Login with mock credentials") {
-                        runBlockAndSetError {
-                            self.vault = try vault.storeTokeychain(credentials: AppCredentials.random).wrap()
-                        }
-                    }
+        Section {
+            Button("Login with mock credentials") {
+                runBlockAndSetError {
+                    self.vault = try vault.storeToKeychain(credentials: AppCredentials.random).wrap()
                 }
-                footer: {
-                    Text("Biometrics unavailable (Simulator or FaceID/TouchID is disabled)")
-                }
-            case .emptyWithBiometrics(let vault):
-                Section {
-                    Button("Login with mock credentials") {
-                        runBlockAndSetError {
-                            self.vault = try vault.storeTokeychain(credentials: AppCredentials.random).wrap()
-                        }
-                    }
-                }
-                Section {
-                    Button("Login with mock credentials AND protect with FaceID in 1 step") {
-                        runBlockAndSetErrorAsync {
-                            self.vault = try await vault.storeToBiometrics(credentials: AppCredentials.random).wrap()
-                        }
-                    }
-                }
-                footer: {
-                    Text(biometricsFooter)
-                }
-            default:
-                fatalError()
             }
+        }
+
+        Section {
+            Button("Login with mock credentials AND protect with FaceID in 1 step") {
+                runBlockAndSetErrorAsync {
+                    self.vault = try await vault.storeToBiometrics(credentials: AppCredentials.random).wrap()
+                }
+            }
+        }
+        footer: {
+            Text(biometricsFooter)
+        }
     }
 
     @ViewBuilder private func lockedView(vault: LockedBiometricsSecureVault<AppCredentials>) -> some View {
@@ -157,38 +139,6 @@ struct ContentView: View {
         }
 
         credentialsSection(vault: vault)
-
-        Section {
-            Button("Reset Vault (Logout user)") {
-                self.vault = vault.reset()
-                self.error = nil
-            }
-        }
-    }
-
-    @ViewBuilder private func keychainUpgradableSecuredView(vault: KeychainUpgradableSecureVault<AppCredentials>) -> some View {
-        Section { Text("Logged in with keychain") }
-        header: { Text("Status") }
-        footer: {
-            Text("You may restart the app to validate that the credentials are retrieved")
-            Text("Use a device to test. Simulator will not work for this feature")
-                .bold()
-                .font(.caption)
-                .foregroundStyle(.red)
-        }
-
-        credentialsSection(vault: vault)
-
-        Section {
-            Button("Update credentials") {
-                runBlockAndSetError {
-                    self.vault = try vault.update(credentials: AppCredentials.random).wrap()
-                }
-            }
-        }
-        footer: {
-            Text("Normally activated when user changes password, access token, etc")
-        }
 
         Section {
             Button("Upgrade to biometrics (enable FaceID/TouchID)") {
@@ -253,7 +203,7 @@ struct ContentView: View {
         Section {
             Button("Logout user and disable FaceID/TouchID") {
                 runBlockAndSetError {
-                    self.vault = try vault.reset()
+                    self.vault = vault.reset()
                 }
             }
         }

@@ -73,7 +73,7 @@ let vault = VaultFactory<MyCredentials>.retrieveVault(key: key)
 
 ```
 
-Switch over the vault type to understand what kind of vault you have and you can decide whether to display a login page, a "biometrics lock" page, or log in the user right away.
+ - Switch over the vault type to understand what kind of vault you have and you can decide whether to display a login page, a "biometrics lock" page, or log in the user right away.
 
 ```swift
     switch vault {
@@ -102,7 +102,10 @@ Switch over the vault type to understand what kind of vault you have and you can
     }
 ```
 
-All operations that can be performed on the vaults are listed below
+ - You can also use the helper methods on the 'Vault' that either do the requested operation or throw an error
+ 
+ 
+ All operations that can be performed on the vaults are listed below.
 
 ### Example
 
@@ -113,25 +116,18 @@ For more information check the sample application at the directory [Example](htt
 There are different kinds of vaults
 
 - EmptyVault
-    - A vault that doesn't actually stores any information but can be used to store credentials in the keychain.
-    - Calling 'storeToKeychain' returns a KeychainSecureVault
-- EmptyVaultWithBiometrics
-    - A vault that doesn't actually stores any information but can be used to store credentials in the keychain and/or protect them with biometrics
-    - Calling 'storeToKeychain' returns a KeychainUpgradableSecureVault
-    - Calling 'storeToBiometrics' returns a BiometricsSecureVault
+    - A vault that doesn't actually stores any information
+    - Store credentials (unsecurely) by calling 'storeToKeychain' and get a KeychainSecureVault
+    - Store credentials securely by calling 'storeToBiometrics' and get a BiometricsSecureVault
 - KeychainSecureVault
     - A vault that holds the credentials on the keychain without any biometrics protection. 
     - Call 'update' to update the credentials
-    - Call 'reset' to delete the credentials and get an empty vault back
-- KeychainUpgradableSecureVault
-    - A vault that holds the credentials on the keychain without any biometrics protection but can be upgraded if required
-    - Call 'update' to update the credentials
     - Call 'upgrade' to enable biometrics protection and get a BiometricsSecureVault back
-    - Call 'reset' to delete the credentials and get an empty vault with biometrics back
+    - Call 'reset' to delete the credentials and get an empty vault back
 - BiometricsSecureVault
     - A vault that holds the credentials on the keychain WITH biometrics protection. Can be downgraded in required
     - Call 'update' to update the credentials
-    - Call 'downgrade' to disable the biometrics protection and get a KeychainUpgradableSecureVault back
+    - Call 'downgrade' to disable the biometrics protection and get a KeychainSecureVault back
     - Call 'reset' to delete the credentials and get an empty vault with biometrics back
     - Call 'reauthenticateOwner' when unlock fails due to FaceID/TouchID being locked (Error: LAError.biometryLockout)
 - LockedBiometricsSecureVault 
@@ -147,20 +143,15 @@ There are different kinds of vaults
 
 ```mermaid
 stateDiagram-v2
-    KeychainUpgradableSecureVault: KeychainUpgradableSecureVault*
     BiometricsSecureVault: BiometricsSecureVault*
     LockedBiometricsSecureVault: LockedBiometricsSecureVault*
-    KeychainSecureVault: LockedBiometricsSecureVault*
+    KeychainSecureVault: KeychainSecureVault*
 
-    [*] --> EmptyVault: "Biometrics are disabled"
-    [*] --> BiometricsEnabled: "Biometrics are enabled"
+    [*] --> EmptyVault
     EmptyVault --> KeychainSecureVault: storeTokeychain
-
-    BiometricsEnabled --> EmptyVaultWithBiometrics
-    EmptyVaultWithBiometrics --> KeychainUpgradableSecureVault: storeTokeychain
-    EmptyVaultWithBiometrics --> BiometricsSecureVault: storeToBiometrics
-    KeychainUpgradableSecureVault --> BiometricsSecureVault: upgradeWithBiometrics
-    BiometricsSecureVault --> KeychainUpgradableSecureVault: downgradeToKeychain
+    KeychainSecureVault --> BiometricsSecureVault: upgradeWithBiometrics
+    EmptyVault --> BiometricsSecureVault: storeToBiometrics
+    BiometricsSecureVault --> KeychainSecureVault: downgradeToKeychain
     BiometricsSecureVault --> LockedBiometricsSecureVault: lock
     LockedBiometricsSecureVault --> BiometricsSecureVault: unlock
 ```

@@ -16,8 +16,12 @@ public struct EmptyVault<Credentials: Codable & Sendable>: Sendable {
         self.keychainKey = key
     }
 
-    public func storeTokeychain(credentials: Credentials) throws -> KeychainSecureVault<Credentials> {
+    public func storeToKeychain(credentials: Credentials) throws -> KeychainSecureVault<Credentials> {
         return try KeychainSecureVault<Credentials>(key: keychainKey, storing: credentials)
+    }
+
+    public func storeToBiometrics(credentials: Credentials) async throws -> BiometricsSecureVault<Credentials> {
+        return try await BiometricsSecureVault<Credentials>(key: keychainKey, storing: credentials)
     }
     
     public func reset() -> Vault<Credentials> {
@@ -30,4 +34,3 @@ public struct EmptyVault<Credentials: Codable & Sendable>: Sendable {
         return .empty(self)
     }
 }
-

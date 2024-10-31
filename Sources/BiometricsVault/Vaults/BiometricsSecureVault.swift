@@ -80,12 +80,12 @@ public struct BiometricsSecureVault<Credentials: Codable & Sendable>: Sendable {
         return try await BiometricsSecureVault<Credentials>(key: keychainKey, storing: credentials)
     }
 
-    public func downgradeToKeychain() throws -> KeychainUpgradableSecureVault<Credentials> {
+    public func downgradeToKeychain() throws -> KeychainSecureVault<Credentials> {
         let existing = try chain.retrieve()
 
         try? chain.delete()
 
-        return try KeychainUpgradableSecureVault(key: keychainKey, storing: existing)
+        return try KeychainSecureVault(key: keychainKey, storing: existing)
     }
 
     public func reset() -> Vault<Credentials> {
