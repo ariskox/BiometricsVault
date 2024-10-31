@@ -20,14 +20,15 @@ BiometricsVault is a Swift 6.0 package for iOS and macOS that makes supporting b
 - You can use it to easily implement a login flow that can support biometrics.
 - The following scenarios can be easily implemented using BiometricsVault:
   
-| Scenario                                 | Biometrics Vault                                                      |
-| ---------------------------------------- | --------------------------------------------------------------------- |
-| The user has just logged in              | Persist the credentials on the keychain across app launches           |
-| The user enables FaceID/TouchID          | Protect the credentials using biometrics                              |
-| The user disables FaceID/TouchID         | Delete the credentials or store them without biometrics security      |
-| The app is locked for security reasons   | Ask for FaceID/TouchID authentication and retrieve the credentials    |
-| User continues an app session            | Ask for FaceID/TouchID authentication and retrieve the credentials    |
-| The user logs out                        | Delete the credentials from the keychain                              |
+| Scenario                                    | Required action                                                       | Function          |
+| ------------------------------------------- | --------------------------------------------------------------------- | ----------------- |
+| New login                                   | Persist the credentials on the keychain across app launches           | storeToKeyChain   |
+| New login & immediate biometrics activation | Persist credentials & protect with biometrics                         | storeToBiometrics |
+| The user enables FaceID/TouchID             | Protect the credentials using biometrics                              | upgrade           |
+| The user disables FaceID/TouchID            | Delete the credentials or store them without biometrics security      | downgrade         |
+| Lock the app for security reasons           | Temporarily forget the data that exist in the keychain                | lock              |
+| The app is locked & need to unlock          | Ask for FaceID/TouchID authentication and retrieve the credentials    | unlock            |
+| The user logs out                           | Delete the credentials from the keychain                              | reset             |
 
 ## Requirements
 

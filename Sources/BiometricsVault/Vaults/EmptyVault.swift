@@ -20,7 +20,7 @@ public struct EmptyVault<Credentials: Codable & Sendable>: Sendable {
         return try KeychainSecureVault<Credentials>(key: keychainKey, storing: credentials)
     }
 
-    public func storeToBiometrics(credentials: Credentials) async throws -> BiometricsSecureVault<Credentials> {
+    public func storeWithBiometrics(credentials: Credentials) async throws -> BiometricsSecureVault<Credentials> {
         return try await BiometricsSecureVault<Credentials>(key: keychainKey, storing: credentials)
     }
     

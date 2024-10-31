@@ -34,6 +34,19 @@ public extension Vault {
         }
     }
 
+    func storeWithBiometrics(credentials: Credentials) async throws -> Vault {
+        switch self {
+        case .biometrics(let vault):
+            throw VaultError.invalid(vault)
+        case .keychain(let vault):
+            throw VaultError.invalid(vault)
+        case .locked(let vault):
+            throw VaultError.invalid(vault)
+        case .empty(let vault):
+            try await vault.storeWithBiometrics(credentials: credentials).wrap()
+        }
+    }
+
     func update(credentials: Credentials) async throws -> Vault {
         switch self {
         case .biometrics(let vault):
@@ -47,7 +60,7 @@ public extension Vault {
         }
     }
 
-    func upgrade() async throws -> Vault {
+    func upgradeToBiometrics() async throws -> Vault {
         switch self {
         case .biometrics(let vault):
             throw VaultError.invalid(vault)
@@ -60,7 +73,7 @@ public extension Vault {
         }
     }
 
-    func downgrade() throws -> Vault {
+    func downgradeToKeychain() throws -> Vault {
         switch self {
         case .biometrics(let vault):
             try vault.downgradeToKeychain().wrap()

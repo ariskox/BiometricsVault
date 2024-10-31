@@ -89,7 +89,7 @@ struct ContentView: View {
         Section {
             Button("Login with mock credentials AND protect with FaceID in 1 step") {
                 runBlockAndSetErrorAsync {
-                    self.vault = try await vault.storeToBiometrics(credentials: AppCredentials.random).wrap()
+                    self.vault = try await vault.storeWithBiometrics(credentials: AppCredentials.random).wrap()
                 }
             }
         }
