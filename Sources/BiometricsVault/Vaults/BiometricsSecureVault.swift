@@ -88,7 +88,7 @@ public struct BiometricsSecureVault<Credentials: Codable & Sendable>: Sendable {
         return try KeychainUpgradableSecureVault(key: keychainKey, storing: existing)
     }
 
-    consuming public func reset() throws -> Vault<Credentials> {
+    consuming public func reset() -> Vault<Credentials> {
         try? chain.delete()
         return VaultFactory.retrieveVault(key: keychainKey)
     }

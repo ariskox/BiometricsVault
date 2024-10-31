@@ -13,6 +13,8 @@ public enum VaultError: Error, LocalizedError {
     case retrievalFailure
     case storingFailure
 
+    case invalidVault(String)
+
     public var errorDescription: String? {
         switch self {
         case .notAvailable:
@@ -21,7 +23,14 @@ public enum VaultError: Error, LocalizedError {
             return NSLocalizedString("biometrics_retrieval_failure", comment: "")
         case .storingFailure:
             return NSLocalizedString("biometrics_storing_failure", comment: "")
+        case .invalidVault(let type):
+            return "\(NSLocalizedString("biometrics_invalid_vault_fmt", comment: "")): \(type)"
         }
+    }
+
+    static func invalid<A>(_ vault: A) -> VaultError {
+        let metatype = type(of: vault)
+        return VaultError.invalidVault("\(metatype)")
     }
 }
 

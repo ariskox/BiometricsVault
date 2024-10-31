@@ -24,6 +24,12 @@ public struct EmptyVaultWithBiometrics<Credentials: Codable & Sendable>: Sendabl
         return try await BiometricsSecureVault<Credentials>(key: keychainKey, storing: credentials)
     }
 
+    consuming public func reset() -> Vault<Credentials> {
+        let chain = KeychainCredentials<Credentials>(key: keychainKey, context: nil)
+        try? chain.delete()
+        return VaultFactory.retrieveVault(key: keychainKey)
+    }
+
     consuming public func wrap() -> Vault<Credentials> {
         return .emptyWithBiometrics(self)
     }
