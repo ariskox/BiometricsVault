@@ -76,11 +76,11 @@ public struct BiometricsSecureVault<Credentials: Codable & Sendable>: Sendable {
         return result
     }
 
-    consuming public func update(credentials: Credentials) async throws -> Self {
+    public func update(credentials: Credentials) async throws -> Self {
         return try await BiometricsSecureVault<Credentials>(key: keychainKey, storing: credentials)
     }
 
-    consuming public func downgradeToKeychain() throws -> KeychainUpgradableSecureVault<Credentials> {
+    public func downgradeToKeychain() throws -> KeychainUpgradableSecureVault<Credentials> {
         let existing = try chain.retrieve()
 
         try? chain.delete()
@@ -88,16 +88,16 @@ public struct BiometricsSecureVault<Credentials: Codable & Sendable>: Sendable {
         return try KeychainUpgradableSecureVault(key: keychainKey, storing: existing)
     }
 
-    consuming public func reset() -> Vault<Credentials> {
+    public func reset() -> Vault<Credentials> {
         try? chain.delete()
         return VaultFactory.retrieveVault(key: keychainKey)
     }
 
-    consuming public func lock() -> LockedBiometricsSecureVault<Credentials> {
+    public func lock() -> LockedBiometricsSecureVault<Credentials> {
         return LockedBiometricsSecureVault<Credentials>(key: keychainKey)
     }
 
-    consuming public func wrap() -> Vault<Credentials> {
+    public func wrap() -> Vault<Credentials> {
         return .biometrics(self)
     }
 

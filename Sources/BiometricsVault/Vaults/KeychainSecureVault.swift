@@ -25,16 +25,16 @@ public struct KeychainSecureVault<Credentials: Codable & Sendable>: Sendable {
         }
     }
 
-    consuming public func update(credentials: Credentials) throws -> Self {
+    public func update(credentials: Credentials) throws -> Self {
         return try KeychainSecureVault<Credentials>(key: keychainKey, storing: credentials)
     }
 
-    consuming public func reset() -> Vault<Credentials> {
+    public func reset() -> Vault<Credentials> {
         try? chain.delete()
         return VaultFactory.retrieveVault(key: keychainKey)
     }
 
-    consuming public func wrap() -> Vault<Credentials> {
+    public func wrap() -> Vault<Credentials> {
         return .keychain(self)
     }
 }

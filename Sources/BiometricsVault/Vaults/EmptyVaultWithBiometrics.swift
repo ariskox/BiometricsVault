@@ -16,21 +16,21 @@ public struct EmptyVaultWithBiometrics<Credentials: Codable & Sendable>: Sendabl
         self.keychainKey = key
     }
 
-    consuming public func storeTokeychain(credentials: Credentials) throws -> KeychainUpgradableSecureVault<Credentials> {
+    public func storeTokeychain(credentials: Credentials) throws -> KeychainUpgradableSecureVault<Credentials> {
         return try KeychainUpgradableSecureVault<Credentials>(key: keychainKey, storing: credentials)
     }
 
-    consuming public func storeToBiometrics(credentials: Credentials) async throws -> BiometricsSecureVault<Credentials> {
+    public func storeToBiometrics(credentials: Credentials) async throws -> BiometricsSecureVault<Credentials> {
         return try await BiometricsSecureVault<Credentials>(key: keychainKey, storing: credentials)
     }
 
-    consuming public func reset() -> Vault<Credentials> {
+    public func reset() -> Vault<Credentials> {
         let chain = KeychainCredentials<Credentials>(key: keychainKey, context: nil)
         try? chain.delete()
         return VaultFactory.retrieveVault(key: keychainKey)
     }
 
-    consuming public func wrap() -> Vault<Credentials> {
+    public func wrap() -> Vault<Credentials> {
         return .emptyWithBiometrics(self)
     }
 }

@@ -16,7 +16,7 @@ public struct LockedBiometricsSecureVault<Credentials: Codable & Sendable>: Send
         self.keychainKey = key
     }
 
-    consuming public func unlock() async throws -> BiometricsSecureVault<Credentials> {
+    public func unlock() async throws -> BiometricsSecureVault<Credentials> {
         // load user from keychain. Validate token ?
         let context = LAContext()
         var error: NSError?
@@ -51,13 +51,13 @@ public struct LockedBiometricsSecureVault<Credentials: Codable & Sendable>: Send
         return result
     }
 
-    consuming public func reset() -> Vault<Credentials> {
+    public func reset() -> Vault<Credentials> {
         let keychain = KeychainCredentials<Credentials>(key: keychainKey, context: nil)
         try? keychain.delete()
         return VaultFactory.retrieveVault(key: keychainKey)
     }
 
-    consuming public func wrap() -> Vault<Credentials> {
+    public func wrap() -> Vault<Credentials> {
         return .locked(self)
     }
 

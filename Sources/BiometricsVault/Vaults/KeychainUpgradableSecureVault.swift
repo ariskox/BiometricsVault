@@ -25,21 +25,21 @@ public struct KeychainUpgradableSecureVault<Credentials: Codable & Sendable>: Se
         }
     }
 
-    consuming public func upgradeWithBiometrics() async throws -> BiometricsSecureVault<Credentials> {
+    public func upgradeWithBiometrics() async throws -> BiometricsSecureVault<Credentials> {
         let credentials = try chain.retrieve()
         return try await BiometricsSecureVault<Credentials>(key: keychainKey, storing: credentials)
     }
 
-    consuming public func update(credentials: Credentials) throws -> Self {
+    public func update(credentials: Credentials) throws -> Self {
         return try KeychainUpgradableSecureVault<Credentials>(key: keychainKey, storing: credentials)
     }
 
-    consuming public func reset() -> Vault<Credentials> {
+    public func reset() -> Vault<Credentials> {
         try? chain.delete()
         return VaultFactory.retrieveVault(key: keychainKey)
     }
 
-    consuming public func wrap() -> Vault<Credentials> {
+    public func wrap() -> Vault<Credentials> {
         return .keychainUpgradable(self)
     }
 }
