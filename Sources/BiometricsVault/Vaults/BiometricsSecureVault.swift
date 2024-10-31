@@ -9,8 +9,7 @@
 @preconcurrency import SimpleKeychain
 import Foundation
 
-@MainActor
-public struct BiometricsSecureVault<Credentials: Codable> {
+public struct BiometricsSecureVault<Credentials: Codable & Sendable>: Sendable {
     private let keychainKey: String
     private let context: LAContext
     private let _credentials: Credentials

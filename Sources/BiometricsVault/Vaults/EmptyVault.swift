@@ -9,8 +9,7 @@
 @preconcurrency import SimpleKeychain
 import Foundation
 
-@MainActor
-public struct EmptyVault<Credentials: Codable> {
+public struct EmptyVault<Credentials: Codable & Sendable>: Sendable {
     private let keychainKey: String
 
     init(key: String) {

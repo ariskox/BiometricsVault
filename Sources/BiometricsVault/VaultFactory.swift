@@ -9,8 +9,7 @@
 @preconcurrency import SimpleKeychain
 import Foundation
 
-@MainActor
-public class VaultFactory<Credentials: Codable> {
+public struct VaultFactory<Credentials: Codable & Sendable> {
     public static func retrieveVault(key: String) -> Vault<Credentials> {
         let context = LAContext()
         context.interactionNotAllowed = true

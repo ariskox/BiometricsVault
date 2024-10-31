@@ -8,7 +8,7 @@
 import SwiftUI
 import BiometricsVault
 
-struct Credentials: Codable {
+struct Credentials: Codable, Sendable {
     let username: String
     let password: String
 

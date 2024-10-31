@@ -7,8 +7,7 @@
 
 import Foundation
 
-@MainActor
-public enum Vault<Credentials: Codable> {
+public enum Vault<Credentials: Codable & Sendable>: Sendable {
     case empty(EmptyVault<Credentials>)
     case emptyWithBiometrics(EmptyVaultWithBiometrics<Credentials>)
     case keychain(KeychainSecureVault<Credentials>)
