@@ -79,7 +79,7 @@ let vault = VaultFactory<MyCredentials>.retrieveVault(key: key)
 ```swift
     switch vault {
     case .empty(let vault):
-        // Go to login screen. Biometrics cannot be could
+        // No credentials exist in the vault. Show the login screen
         displayLoginScreen()
     case .keychain(let vault):
         // Log in the user right away and use the credentials from the vault to do so
